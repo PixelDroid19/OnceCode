@@ -1,7 +1,5 @@
 # MiniCode
 
-[![Star History Chart](https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
-
 [简体中文](./README.zh-CN.md) | [Architecture](./ARCHITECTURE.md) | [Learn Claude Code Design Through MiniCode](./CLAUDE_CODE_PATTERNS.md) | [License](./LICENSE)
 
 A lightweight terminal coding assistant for local development workflows.
@@ -369,7 +367,7 @@ This README uses the open source [Star History](https://www.star-history.com/) c
 Current embed snippet:
 
 ```md
-[![Star History Chart](https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
 ```
 
 ## Learn Claude Code Design Through MiniCode

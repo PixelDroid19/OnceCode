@@ -1,7 +1,5 @@
 # MiniCode
 
-[![Star History Chart](https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
-
 [English](./README.md) | [架构说明](./ARCHITECTURE_ZH.md) | [通过 MiniCode 学习 Claude Code 设计](./CLAUDE_CODE_PATTERNS_ZH.md) | [License](./LICENSE)
 
 一个面向本地开发工作流的轻量级终端编码助手。
@@ -369,7 +367,7 @@ MiniCode 当前主要支持：
 当前嵌入方式：
 
 ```md
-[![Star History Chart](https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=LiuMengxuan04/MiniCode&type=Date)](https://www.star-history.com/#LiuMengxuan04/MiniCode&Date)
 ```
 
 ## 通过 MiniCode 学习 Claude Code 设计
