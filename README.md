@@ -183,7 +183,9 @@ MINI_CODE_MODEL_MODE=mock npm run dev
 ### Management commands
 
 - `minicode mcp list`
-- `minicode mcp add <name> [--project] [--protocol <mode>] [--env KEY=VALUE ...] -- <command> [args...]`
+- `minicode mcp add <name> [--project] [--protocol <mode>] [--url <endpoint>] [--header KEY=VALUE ...] [--env KEY=VALUE ...] [-- <command> [args...]]`
+- `minicode mcp login <name> --token <bearer-token>`
+- `minicode mcp logout <name>`
 - `minicode mcp remove <name> [--project]`
 - `minicode skills list`
 - `minicode skills add <path> [--name <name>] [--project]`
@@ -219,6 +221,13 @@ Example configuration:
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "remote-example": {
+      "protocol": "streamable-http",
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-token"
+      }
     }
   },
   "env": {
@@ -247,6 +256,15 @@ For vendor compatibility, MiniCode now auto-negotiates stdio framing:
 - standard MCP `Content-Length` framing is tried first
 - if that fails, MiniCode falls back to newline-delimited JSON
 - you can force a mode per server with `"protocol": "content-length"` or `"protocol": "newline-json"`
+- for remote MCP over HTTP, use `"protocol": "streamable-http"` with `"url"` (and optional `"headers"`)
+- header values support environment interpolation, e.g. `"Authorization": "Bearer $MCP_TOKEN"`
+
+Remote MCP authentication strategy (lightweight by design):
+
+- use `minicode mcp login <name> --token <bearer-token>` to store a bearer token locally
+- use `minicode mcp logout <name>` to clear a stored token
+- for now, MiniCode intentionally uses this token-based path instead of a full built-in OAuth callback + refresh state machine
+- this keeps the implementation small and aligned with MiniCode's lightweight architecture goals; full OAuth automation may be added later when needed
 
 Skills are discovered from:
 

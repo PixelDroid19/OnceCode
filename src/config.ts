@@ -13,9 +13,11 @@ export type McpServerConfig = {
   command: string
   args?: string[]
   env?: Record<string, string | number>
+  url?: string
+  headers?: Record<string, string | number>
   cwd?: string
   enabled?: boolean
-  protocol?: 'auto' | 'content-length' | 'newline-json'
+  protocol?: 'auto' | 'content-length' | 'newline-json' | 'streamable-http'
 }
 
 export type RuntimeConfig = {
@@ -35,8 +37,40 @@ export const MINI_CODE_SETTINGS_PATH = path.join(MINI_CODE_DIR, 'settings.json')
 export const MINI_CODE_HISTORY_PATH = path.join(MINI_CODE_DIR, 'history.json')
 export const MINI_CODE_PERMISSIONS_PATH = path.join(MINI_CODE_DIR, 'permissions.json')
 export const MINI_CODE_MCP_PATH = path.join(MINI_CODE_DIR, 'mcp.json')
+export const MINI_CODE_MCP_TOKENS_PATH = path.join(MINI_CODE_DIR, 'mcp-tokens.json')
 export const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json')
 export const PROJECT_MCP_PATH = path.join(process.cwd(), '.mcp.json')
+
+export async function readMcpTokensFile(
+  filePath = MINI_CODE_MCP_TOKENS_PATH,
+): Promise<Record<string, string>> {
+  try {
+    const content = await readFile(filePath, 'utf8')
+    const parsed = JSON.parse(content) as unknown
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {}
+    }
+    return parsed as Record<string, string>
+  } catch (error) {
+    const code =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof error.code === 'string'
+        ? error.code
+        : ''
+    if (code === 'ENOENT') return {}
+    throw error
+  }
+}
+
+export async function saveMcpTokensFile(
+  tokens: Record<string, string>,
+  filePath = MINI_CODE_MCP_TOKENS_PATH,
+): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true })
+  await writeFile(filePath, `${JSON.stringify(tokens, null, 2)}\n`, 'utf8')
+}
 
 async function readSettingsFile(filePath: string): Promise<MiniCodeSettings> {
   try {
@@ -136,6 +170,10 @@ function mergeSettings(
       env: {
         ...(mergedMcpServers[name]?.env ?? {}),
         ...(server.env ?? {}),
+      },
+      headers: {
+        ...(mergedMcpServers[name]?.headers ?? {}),
+        ...(server.headers ?? {}),
       },
     }
   }

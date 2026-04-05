@@ -182,7 +182,9 @@ MINI_CODE_MODEL_MODE=mock npm run dev
 ### 管理命令
 
 - `minicode mcp list`
-- `minicode mcp add <name> [--project] [--protocol <mode>] [--env KEY=VALUE ...] -- <command> [args...]`
+- `minicode mcp add <name> [--project] [--protocol <mode>] [--url <endpoint>] [--header KEY=VALUE ...] [--env KEY=VALUE ...] [-- <command> [args...]]`
+- `minicode mcp login <name> --token <bearer-token>`
+- `minicode mcp logout <name>`
 - `minicode mcp remove <name> [--project]`
 - `minicode skills list`
 - `minicode skills add <path> [--name <name>] [--project]`
@@ -218,6 +220,13 @@ MINI_CODE_MODEL_MODE=mock npm run dev
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "remote-example": {
+      "protocol": "streamable-http",
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-token"
+      }
     }
   },
   "env": {
@@ -246,6 +255,15 @@ MINI_CODE_MODEL_MODE=mock npm run dev
 - 默认先尝试标准 MCP 的 `Content-Length` framing
 - 如果失败，再自动回退到按行分隔的 JSON
 - 也可以在单个 server 上通过 `"protocol": "content-length"` 或 `"protocol": "newline-json"` 强制指定
+- 远程 MCP 可使用 `"protocol": "streamable-http"`，并配置 `"url"`（可选 `"headers"`）
+- header 的值支持环境变量插值，例如 `"Authorization": "Bearer $MCP_TOKEN"`
+
+远程 MCP 认证策略（保持轻量）：
+
+- 使用 `minicode mcp login <name> --token <bearer-token>` 本地保存 bearer token
+- 使用 `minicode mcp logout <name>` 清除已保存 token
+- 当前版本有意采用 token 方案，不内置完整 OAuth 回调 + refresh 状态机
+- 这样可以保持实现简洁并符合 MiniCode 轻量架构目标；后续确有需要再补完整 OAuth 自动化
 
 Skills 默认会从这些位置发现：
 
