@@ -45,7 +45,7 @@ MiniCode 优先保留这些能力：
 - `src/index.ts`: CLI 入口
 - `src/agent-loop.ts`: 多轮工具调用循环
 - `src/tool.ts`: 注册、校验、执行
-- `src/tools/*`: `list_files` / `grep_files` / `read_file` / `write_file` / `edit_file` / `patch_file` / `modify_file` / `run_command` / `ask_user` / `load_skill`
+- `src/tools/*`: `list_files` / `grep_files` / `read_file` / `write_file` / `edit_file` / `patch_file` / `modify_file` / `run_command` / `web_fetch` / `web_search` / `ask_user` / `load_skill`
 - `src/config.ts`: 使用独立的 `~/.mini-code`
 - `src/skills.ts`: 扫描 `.mini-code/skills` 和兼容的 `.claude/skills` 目录
 - `src/mcp.ts`: 启动 stdio MCP server，协商兼容的 framing，并把远端 MCP tools 封装成当前工具协议
