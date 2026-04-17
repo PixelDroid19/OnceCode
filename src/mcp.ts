@@ -5,6 +5,17 @@ import path from 'node:path'
 import { z } from 'zod'
 import { readMcpTokensFile } from './config.js'
 import type { McpServerConfig } from './config.js'
+import {
+  createMcpPromptTools,
+  createMcpResourceTools,
+} from './mcp-helper-tools.js'
+import {
+  formatPromptResult,
+  formatReadResourceResult,
+  formatToolCallResult,
+  normalizeInputSchema,
+  sanitizeToolSegment,
+} from './mcp-tool-utils.js'
 import type { ToolDefinition, ToolResult } from './tool.js'
 import { getErrorCode } from './utils/errors.js'
 
@@ -64,7 +75,7 @@ const MCP_INITIALIZE_TIMEOUT_MS = 10000
 const MCP_INITIALIZE_PROBE_TIMEOUT_MS = 1200
 const MCP_PROTOCOL_CACHE_PATH = path.join(
   os.homedir(),
-  '.mini-code',
+  '.oncecode',
   'mcp-protocol-cache.json',
 )
 
@@ -108,175 +119,6 @@ function isInitializeTimeoutError(error: unknown): boolean {
   )
 }
 
-function sanitizeToolSegment(value: string): string {
-  return (
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'tool'
-  )
-}
-
-function normalizeInputSchema(
-  schema: Record<string, unknown> | undefined,
-): Record<string, unknown> {
-  if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
-    return schema
-  }
-
-  return {
-    type: 'object',
-    additionalProperties: true,
-  }
-}
-
-function formatContentBlock(block: unknown): string {
-  if (!block || typeof block !== 'object') {
-    return JSON.stringify(block, null, 2)
-  }
-
-  if ('type' in block && block.type === 'text' && 'text' in block) {
-    return String(block.text)
-  }
-
-  if ('type' in block && 'resource' in block) {
-    return JSON.stringify(block, null, 2)
-  }
-
-  return JSON.stringify(block, null, 2)
-}
-
-function formatToolCallResult(result: unknown): ToolResult {
-  if (!result || typeof result !== 'object') {
-    return {
-      ok: true,
-      output: JSON.stringify(result, null, 2),
-    }
-  }
-
-  const typedResult = result as {
-    content?: unknown[]
-    structuredContent?: unknown
-    isError?: boolean
-  }
-
-  const parts: string[] = []
-
-  if (Array.isArray(typedResult.content) && typedResult.content.length > 0) {
-    parts.push(typedResult.content.map(formatContentBlock).join('\n\n'))
-  }
-
-  if (typedResult.structuredContent !== undefined) {
-    parts.push(
-      `STRUCTURED_CONTENT:\n${JSON.stringify(typedResult.structuredContent, null, 2)}`,
-    )
-  }
-
-  if (parts.length === 0) {
-    parts.push(JSON.stringify(result, null, 2))
-  }
-
-  return {
-    ok: !typedResult.isError,
-    output: parts.join('\n\n').trim(),
-  }
-}
-
-function formatReadResourceResult(result: unknown): ToolResult {
-  if (!result || typeof result !== 'object') {
-    return {
-      ok: false,
-      output: JSON.stringify(result, null, 2),
-    }
-  }
-
-  const typedResult = result as {
-    contents?: Array<{
-      uri?: string
-      mimeType?: string
-      text?: string
-      blob?: string
-    }>
-  }
-
-  const contents = typedResult.contents ?? []
-  if (contents.length === 0) {
-    return {
-      ok: true,
-      output: 'No resource contents returned.',
-    }
-  }
-
-  return {
-    ok: true,
-    output: contents
-      .map(item => {
-        const headerLines = [`URI: ${item.uri ?? '(unknown)'}`]
-        if (item.mimeType) {
-          headerLines.push(`MIME: ${item.mimeType}`)
-        }
-        const header = `${headerLines.join('\n')}\n\n`
-
-        if (typeof item.text === 'string') {
-          return `${header}${item.text}`
-        }
-
-        if (typeof item.blob === 'string') {
-          return `${header}BLOB:\n${item.blob}`
-        }
-
-        return `${header}${JSON.stringify(item, null, 2)}`
-      })
-      .join('\n\n'),
-  }
-}
-
-function formatPromptResult(result: unknown): ToolResult {
-  if (!result || typeof result !== 'object') {
-    return {
-      ok: false,
-      output: JSON.stringify(result, null, 2),
-    }
-  }
-
-  const typedResult = result as {
-    description?: string
-    messages?: Array<{
-      role?: string
-      content?: unknown
-    }>
-  }
-
-  const header = typedResult.description
-    ? `DESCRIPTION: ${typedResult.description}\n\n`
-    : ''
-  const body = (typedResult.messages ?? [])
-    .map(message => {
-      const role = message.role ?? 'unknown'
-      if (typeof message.content === 'string') {
-        return `[${role}]\n${message.content}`
-      }
-      if (Array.isArray(message.content)) {
-        return `[${role}]\n${message.content
-          .map(part => {
-            if (typeof part === 'string') return part
-            if (part && typeof part === 'object' && 'text' in part) {
-              return String(part.text)
-            }
-            return JSON.stringify(part, null, 2)
-          })
-          .join('\n')}`
-      }
-      return `[${role}]\n${JSON.stringify(message.content, null, 2)}`
-    })
-    .join('\n\n')
-
-  return {
-    ok: true,
-    output: `${header}${body}`.trim() || JSON.stringify(result, null, 2),
-  }
-}
-
 function summarizeServerEndpoint(config: McpServerConfig): string {
   const remoteUrl = config.url?.trim()
   if (remoteUrl) return remoteUrl
@@ -315,8 +157,8 @@ function extractAuthHint(headers: Headers): string | null {
   const challenges = headers.get('www-authenticate')
   if (!challenges) return null
   const parts: string[] = [challenges]
-  const resourceMetadata = /resource_metadata=\"([^\"]+)\"/i.exec(challenges)?.[1]
-  const authorizationUri = /authorization_uri=\"([^\"]+)\"/i.exec(challenges)?.[1]
+  const resourceMetadata = /resource_metadata="([^"]+)"/i.exec(challenges)?.[1]
+  const authorizationUri = /authorization_uri="([^"]+)"/i.exec(challenges)?.[1]
   if (resourceMetadata) {
     parts.push(`resource_metadata=${resourceMetadata}`)
   }
@@ -326,7 +168,7 @@ function extractAuthHint(headers: Headers): string | null {
   return parts.join('\n')
 }
 
-type McpClientLike = {
+export type McpClientLike = {
   start(): Promise<void>
   getProtocol(): JsonRpcProtocol | null
   getServerName(): string
@@ -464,7 +306,7 @@ class StdioMcpClient {
         protocolVersion: '2024-11-05',
         capabilities: {},
         clientInfo: {
-          name: 'mini-code',
+          name: 'oncecode',
           version: '0.1.0',
         },
       },
@@ -807,7 +649,7 @@ class StreamableHttpMcpClient {
         protocolVersion: '2024-11-05',
         capabilities: {},
         clientInfo: {
-          name: 'mini-code',
+          name: 'oncecode',
           version: '0.1.0',
         },
       },
@@ -1108,163 +950,11 @@ export async function createMcpBackedTools(args: {
   }
 
   if (clientsByServer.size > 0 && hasPublishedResources) {
-    tools.push({
-      name: 'list_mcp_resources',
-      description: 'List optional MCP resources exposed by connected MCP servers when a server actually publishes them.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          server: { type: 'string' },
-        },
-      },
-      schema: z.object({
-        server: z.string().optional(),
-      }),
-      async run(input: { server?: string }) {
-        const targetClients = input.server
-          ? [clientsByServer.get(input.server)].filter(
-              (client): client is McpClientLike => client !== undefined,
-            )
-          : [...clientsByServer.values()]
-        const lines: string[] = []
-        for (const client of targetClients) {
-          try {
-            const resources = await client.listResources()
-            for (const resource of resources) {
-              lines.push(
-                `${client.getServerName()}: ${resource.uri}${resource.name ? ` (${resource.name})` : ''}${resource.description ? ` - ${resource.description}` : ''}`,
-              )
-            }
-          } catch (error) {
-            lines.push(
-              `${client.getServerName()}: failed to list resources (${error instanceof Error ? error.message : String(error)})`,
-            )
-          }
-        }
-        return {
-          ok: true,
-          output:
-            lines.length > 0
-              ? lines.join('\n')
-              : 'Connected MCP servers did not publish any MCP resources. This does not mean MCP tools are unavailable.',
-        }
-      },
-    } satisfies ToolDefinition<{ server?: string }>)
-
-    tools.push({
-      name: 'read_mcp_resource',
-      description: 'Read a specific optional MCP resource by server and URI.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          server: { type: 'string' },
-          uri: { type: 'string' },
-        },
-        required: ['server', 'uri'],
-      },
-      schema: z.object({
-        server: z.string().min(1),
-        uri: z.string().min(1),
-      }),
-      async run(input: { server: string; uri: string }) {
-        const client = clientsByServer.get(input.server)
-        if (!client) {
-          return {
-            ok: false,
-            output: `Unknown MCP server: ${input.server}`,
-          }
-        }
-        return client.readResource(input.uri)
-      },
-    } satisfies ToolDefinition<{ server: string; uri: string }>)
+    tools.push(...createMcpResourceTools(clientsByServer))
   }
 
   if (clientsByServer.size > 0 && hasPublishedPrompts) {
-    tools.push({
-      name: 'list_mcp_prompts',
-      description: 'List optional MCP prompts exposed by connected MCP servers when a server actually publishes them.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          server: { type: 'string' },
-        },
-      },
-      schema: z.object({
-        server: z.string().optional(),
-      }),
-      async run(input: { server?: string }) {
-        const targetClients = input.server
-          ? [clientsByServer.get(input.server)].filter(
-              (client): client is McpClientLike => client !== undefined,
-            )
-          : [...clientsByServer.values()]
-        const lines: string[] = []
-        for (const client of targetClients) {
-          try {
-            const prompts = await client.listPrompts()
-            for (const prompt of prompts) {
-              const argsSummary = (prompt.arguments ?? [])
-                .map(arg => `${arg.name}${arg.required ? '*' : ''}`)
-                .join(', ')
-              lines.push(
-                `${client.getServerName()}: ${prompt.name}${argsSummary ? ` args=[${argsSummary}]` : ''}${prompt.description ? ` - ${prompt.description}` : ''}`,
-              )
-            }
-          } catch (error) {
-            lines.push(
-              `${client.getServerName()}: failed to list prompts (${error instanceof Error ? error.message : String(error)})`,
-            )
-          }
-        }
-        return {
-          ok: true,
-          output:
-            lines.length > 0
-              ? lines.join('\n')
-              : 'Connected MCP servers did not publish any MCP prompts. This does not mean MCP tools are unavailable.',
-        }
-      },
-    } satisfies ToolDefinition<{ server?: string }>)
-
-    tools.push({
-      name: 'get_mcp_prompt',
-      description: 'Fetch a rendered optional MCP prompt by server, prompt name, and optional arguments.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          server: { type: 'string' },
-          name: { type: 'string' },
-          arguments: {
-            type: 'object',
-            additionalProperties: { type: 'string' },
-          },
-        },
-        required: ['server', 'name'],
-      },
-      schema: z.object({
-        server: z.string().min(1),
-        name: z.string().min(1),
-        arguments: z.record(z.string(), z.string()).optional(),
-      }),
-      async run(input: {
-        server: string
-        name: string
-        arguments?: Record<string, string>
-      }) {
-        const client = clientsByServer.get(input.server)
-        if (!client) {
-          return {
-            ok: false,
-            output: `Unknown MCP server: ${input.server}`,
-          }
-        }
-        return client.getPrompt(input.name, input.arguments)
-      },
-    } satisfies ToolDefinition<{
-      server: string
-      name: string
-      arguments?: Record<string, string>
-    }>)
+    tools.push(...createMcpPromptTools(clientsByServer))
   }
 
   return {

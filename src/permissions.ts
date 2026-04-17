@@ -1,7 +1,17 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { MINI_CODE_DIR } from './config.js'
-import { isEnoentError } from './utils/errors.js'
+import {
+  getPermissionsPath as getStoredPermissionsPath,
+  readPermissionStore,
+  writePermissionStore,
+} from './permission-store.js'
+import {
+  classifyDangerousCommand,
+  formatCommandSignature,
+  isWithinDirectory,
+  matchesDirectoryPrefix,
+  normalizePath,
+} from './permission-rules.js'
+import type { PathIntent } from './permission-rules.js'
 
 export type PermissionDecision =
   | 'allow_once'
@@ -38,120 +48,6 @@ export type PermissionRequest = {
 export type PermissionPromptHandler = (
   request: PermissionRequest,
 ) => Promise<PermissionPromptResult>
-
-type PermissionStore = {
-  allowedDirectoryPrefixes?: string[]
-  deniedDirectoryPrefixes?: string[]
-  allowedCommandPatterns?: string[]
-  deniedCommandPatterns?: string[]
-  allowedEditPatterns?: string[]
-  deniedEditPatterns?: string[]
-}
-
-type PathIntent = 'read' | 'write' | 'list' | 'search' | 'command_cwd'
-
-const PERMISSIONS_PATH = path.join(MINI_CODE_DIR, 'permissions.json')
-
-function normalizePath(targetPath: string): string {
-  return path.resolve(targetPath)
-}
-
-function isWithinDirectory(root: string, target: string): boolean {
-  const relative = path.relative(root, target)
-  return (
-    relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) &&
-      relative !== '..' &&
-      !path.isAbsolute(relative))
-  )
-}
-
-function matchesDirectoryPrefix(
-  targetPath: string,
-  directories: Iterable<string>,
-): boolean {
-  for (const directory of directories) {
-    if (isWithinDirectory(directory, targetPath)) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function formatCommandSignature(command: string, args: string[]): string {
-  return [command, ...args].join(' ').trim()
-}
-
-function classifyDangerousCommand(command: string, args: string[]): string | null {
-  const normalizedArgs = args.map(arg => arg.trim()).filter(Boolean)
-  const signature = formatCommandSignature(command, normalizedArgs)
-
-  if (command === 'git') {
-    if (normalizedArgs.includes('reset') && normalizedArgs.includes('--hard')) {
-      return `git reset --hard can discard local changes (${signature})`
-    }
-
-    if (normalizedArgs.includes('clean')) {
-      return `git clean can delete untracked files (${signature})`
-    }
-
-    if (
-      normalizedArgs.includes('checkout') &&
-      normalizedArgs.includes('--')
-    ) {
-      return `git checkout -- can overwrite working tree files (${signature})`
-    }
-
-    if (
-      normalizedArgs.includes('restore') &&
-      normalizedArgs.some(arg => arg.startsWith('--source'))
-    ) {
-      return `git restore --source can overwrite local files (${signature})`
-    }
-
-    if (
-      normalizedArgs.includes('push') &&
-      normalizedArgs.some(arg => arg === '--force' || arg === '-f')
-    ) {
-      return `git push --force rewrites remote history (${signature})`
-    }
-  }
-
-  if (command === 'npm' && normalizedArgs.includes('publish')) {
-    return `npm publish affects a registry outside this machine (${signature})`
-  }
-
-  if (
-    command === 'node' ||
-    command === 'python3' ||
-    command === 'bun' ||
-    command === 'bash' ||
-    command === 'sh'
-  ) {
-    return `${command} can execute arbitrary local code (${signature})`
-  }
-
-  return null
-}
-
-async function readPermissionStore(): Promise<PermissionStore> {
-  try {
-    const content = await readFile(PERMISSIONS_PATH, 'utf8')
-    return JSON.parse(content) as PermissionStore
-  } catch (error) {
-    if (isEnoentError(error)) {
-      return {}
-    }
-
-    throw error
-  }
-}
-
-async function writePermissionStore(store: PermissionStore): Promise<void> {
-  await mkdir(MINI_CODE_DIR, { recursive: true })
-  await writeFile(PERMISSIONS_PATH, `${JSON.stringify(store, null, 2)}\n`, 'utf8')
-}
 
 export class PermissionManager {
   private readonly allowedDirectoryPrefixes = new Set<string>()
@@ -282,7 +178,7 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Path ${normalizedTarget} is outside cwd ${this.workspaceRoot}. Start minicode in TTY mode to approve it.`,
+        `Path ${normalizedTarget} is outside cwd ${this.workspaceRoot}. Start oncecode in TTY mode to approve it.`,
       )
     }
 
@@ -293,7 +189,7 @@ export class PermissionManager {
 
     const promptResult = await this.prompt({
       kind: 'path',
-      summary: `mini-code wants ${intent.replace('_', ' ')} access outside the current cwd`,
+      summary: `oncecode wants ${intent.replace('_', ' ')} access outside the current cwd`,
       details: [
         `cwd: ${this.workspaceRoot}`,
         `target: ${normalizedTarget}`,
@@ -362,15 +258,15 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Command requires approval: ${signature}. Start minicode in TTY mode to approve it.`,
+        `Command requires approval: ${signature}. Start oncecode in TTY mode to approve it.`,
       )
     }
 
     const promptResult = await this.prompt({
       kind: 'command',
       summary: options?.forcePromptReason
-        ? 'mini-code wants approval for this command'
-        : 'mini-code wants to run a dangerous command',
+        ? 'oncecode wants approval for this command'
+        : 'oncecode wants to run a dangerous command',
       details: [
         `cwd: ${commandCwd}`,
         `command: ${signature}`,
@@ -429,13 +325,13 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Edit requires approval: ${normalizedTarget}. Start minicode in TTY mode to review it.`,
+        `Edit requires approval: ${normalizedTarget}. Start oncecode in TTY mode to review it.`,
       )
     }
 
     const promptResult = await this.prompt({
       kind: 'edit',
-      summary: 'mini-code wants to apply a file modification',
+      summary: 'oncecode wants to apply a file modification',
       details: [
         `target: ${normalizedTarget}`,
         '',
@@ -497,5 +393,5 @@ export class PermissionManager {
 }
 
 export function getPermissionsPath(): string {
-  return PERMISSIONS_PATH
+  return getStoredPermissionsPath()
 }

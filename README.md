@@ -1,14 +1,14 @@
-# MiniCode
+# OnceCode
 
 <p align="center">
-  <img src="./docs/logo.svg" alt="MiniCode Logo" width="180" />
+  <img src="./docs/logo.svg" alt="OnceCode Logo" width="180" />
 </p>
 
-<h2 align="center">MiniCode</h2>
+<h2 align="center">OnceCode</h2>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Editor-Minicode-D97757?style=for-the-badge" alt="Editor: Minicode" />
-  <img src="https://img.shields.io/badge/%23minicode-Project-B85C3F?style=for-the-badge" alt="#minicode" />
+  <img src="https://img.shields.io/badge/Editor-OnceCode-D97757?style=for-the-badge" alt="Editor: OnceCode" />
+  <img src="https://img.shields.io/badge/%23oncecode-Project-B85C3F?style=for-the-badge" alt="#oncecode" />
   <img src="https://img.shields.io/badge/%23lightweight-Focus-F0EBE1?style=for-the-badge&labelColor=8B8B8B" alt="#lightweight" />
 </p>
 
@@ -18,17 +18,17 @@
   A lightweight, highly efficient coding tool. Designed for speed, built for simplicity.
 </p>
 
-[简体中文](./README.zh-CN.md) | [DeepWiki](https://deepwiki.com/LiuMengxuan04/MiniCode) | [Architecture](./ARCHITECTURE.md) | [Contributing](./CONTRIBUTING.md) | [Roadmap](./ROADMAP.md) | [Learn Claude Code Design Through MiniCode](./CLAUDE_CODE_PATTERNS.md) | [License](./LICENSE)
+[DeepWiki](https://deepwiki.com/LiuMengxuan04/OnceCode) | [Architecture](./ARCHITECTURE.md) | [Contributing](./CONTRIBUTING.md) | [Roadmap](./ROADMAP.md) | [Learn Claude Code Design Through OnceCode](./CLAUDE_CODE_PATTERNS.md) | [License](./LICENSE)
 
 A lightweight terminal coding assistant for local development workflows.
 
-MiniCode provides Claude Code-like workflow and architectural ideas in a much smaller implementation, making it especially useful for learning, experimentation, and custom tooling.
+OnceCode provides Claude Code-like workflow and architectural ideas in a much smaller implementation, making it especially useful for learning, experimentation, and custom tooling.
 
-You can also explore this project through [DeepWiki](https://deepwiki.com/LiuMengxuan04/MiniCode).
+You can also explore this project through [DeepWiki](https://deepwiki.com/LiuMengxuan04/OnceCode).
 
 ## Overview
 
-MiniCode is built around a practical terminal-first agent loop:
+OnceCode is built around a practical terminal-first agent loop:
 
 - accept a user request
 - inspect the workspace
@@ -40,20 +40,20 @@ The project is intentionally compact, so the control flow, tool model, and TUI b
 
 ## Multi-language Versions
 
-- TypeScript (this repo): [MiniCode](https://github.com/LiuMengxuan04/MiniCode)
-- Rust version: [MiniCode-rs (latest)](https://github.com/harkerhand/MiniCode-rs/tree/master)
-- Python version: [MiniCode-Python](https://github.com/QUSETIONS/MiniCode-Python)
+- TypeScript (this repo): the reference OnceCode implementation in this repository
+- Rust version: companion implementation tracked outside this repository
+- Python version: companion implementation tracked outside this repository
 
 ## Branch Highlights
 
-- TypeScript version: the reference implementation for MiniCode's core workflow, documentation, and product showcase. More branch-specific features are still being shaped.
-- Rust version: keeps conversation history inside the working directory, making it easier to move or migrate a project without losing its local MiniCode context.
+- TypeScript version: the reference implementation for OnceCode's core workflow, documentation, and product showcase. More branch-specific features are still being shaped.
+- Rust version: keeps conversation history inside the working directory, making it easier to move or migrate a project without losing its local OnceCode context.
 - Python version: a Python-native implementation branch. More branch-specific features are still being shaped.
 
 ## Table of Contents
 
 - [Product Showcase Page](#product-showcase-page)
-- [Why MiniCode](#why-minicode)
+- [Why OnceCode](#why-oncecode)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -65,17 +65,17 @@ The project is intentionally compact, so the control flow, tool model, and TUI b
 - [Architecture Docs](#architecture-docs)
 - [Contributing](#contributing)
 - [Roadmap](#roadmap)
-- [Learn Claude Code Design Through MiniCode](#learn-claude-code-design-through-minicode)
+- [Learn Claude Code Design Through OnceCode](#learn-claude-code-design-through-oncecode)
 - [Development](#development)
 
 ## Product Showcase Page
 
 - Open [docs/index.html](./docs/index.html) in a browser for a visual product overview.
-- GitHub Pages (recommended): `https://liumengxuan04.github.io/MiniCode/`
+- Public site URL can be added here once the OnceCode Pages deployment is live.
 
-## Why MiniCode
+## Why OnceCode
 
-MiniCode is a good fit if you want:
+OnceCode is a good fit if you want:
 
 - a lightweight coding assistant instead of a large platform
 - a terminal UI with tool calling, transcript, and command workflow
@@ -140,7 +140,7 @@ MiniCode is a good fit if you want:
 ## Installation
 
 ```bash
-cd mini-code
+cd oncecode
 npm install
 npm run install-local
 ```
@@ -153,12 +153,12 @@ The installer will ask for:
 
 Configuration is stored in:
 
-- `~/.mini-code/settings.json`
-- `~/.mini-code/mcp.json`
+- `~/.oncecode/settings.json`
+- `~/.oncecode/mcp.json`
 
 The launcher is installed to:
 
-- `~/.local/bin/minicode`
+- `~/.local/bin/oncecode`
 
 If `~/.local/bin` is not already on your `PATH`, add:
 
@@ -171,7 +171,7 @@ export PATH="$HOME/.local/bin:$PATH"
 Run the installed launcher:
 
 ```bash
-minicode
+oncecode
 ```
 
 Run in development mode:
@@ -183,21 +183,21 @@ npm run dev
 Run in offline demo mode:
 
 ```bash
-MINI_CODE_MODEL_MODE=mock npm run dev
+ONCECODE_MODEL_MODE=mock npm run dev
 ```
 
 ## Commands
 
 ### Management commands
 
-- `minicode mcp list`
-- `minicode mcp add <name> [--project] [--protocol <mode>] [--url <endpoint>] [--header KEY=VALUE ...] [--env KEY=VALUE ...] [-- <command> [args...]]`
-- `minicode mcp login <name> --token <bearer-token>`
-- `minicode mcp logout <name>`
-- `minicode mcp remove <name> [--project]`
-- `minicode skills list`
-- `minicode skills add <path> [--name <name>] [--project]`
-- `minicode skills remove <name> [--project]`
+- `oncecode mcp list`
+- `oncecode mcp add <name> [--project] [--protocol <mode>] [--url <endpoint>] [--header KEY=VALUE ...] [--env KEY=VALUE ...] [-- <command> [args...]]`
+- `oncecode mcp login <name> --token <bearer-token>`
+- `oncecode mcp logout <name>`
+- `oncecode mcp remove <name> [--project]`
+- `oncecode skills list`
+- `oncecode skills add <path> [--name <name>] [--project]`
+- `oncecode skills remove <name> [--project]`
 
 ### Local slash commands
 
@@ -259,55 +259,55 @@ Project-scoped MCP config is also supported through Claude Code compatible `.mcp
 }
 ```
 
-For vendor compatibility, MiniCode now auto-negotiates stdio framing:
+For vendor compatibility, OnceCode now auto-negotiates stdio framing:
 
 - standard MCP `Content-Length` framing is tried first
-- if that fails, MiniCode falls back to newline-delimited JSON
+- if that fails, OnceCode falls back to newline-delimited JSON
 - you can force a mode per server with `"protocol": "content-length"` or `"protocol": "newline-json"`
 - for remote MCP over HTTP, use `"protocol": "streamable-http"` with `"url"` (and optional `"headers"`)
 - header values support environment interpolation, e.g. `"Authorization": "Bearer $MCP_TOKEN"`
 
 Remote MCP authentication strategy (lightweight by design):
 
-- use `minicode mcp login <name> --token <bearer-token>` to store a bearer token locally
-- use `minicode mcp logout <name>` to clear a stored token
-- for now, MiniCode intentionally uses this token-based path instead of a full built-in OAuth callback + refresh state machine
-- this keeps the implementation small and aligned with MiniCode's lightweight architecture goals; full OAuth automation may be added later when needed
+- use `oncecode mcp login <name> --token <bearer-token>` to store a bearer token locally
+- use `oncecode mcp logout <name>` to clear a stored token
+- for now, OnceCode intentionally uses this token-based path instead of a full built-in OAuth callback + refresh state machine
+- this keeps the implementation small and aligned with OnceCode's lightweight architecture goals; full OAuth automation may be added later when needed
 
 Skills are discovered from:
 
-- `./.mini-code/skills/<skill-name>/SKILL.md`
-- `~/.mini-code/skills/<skill-name>/SKILL.md`
+- `./.oncecode/skills/<skill-name>/SKILL.md`
+- `~/.oncecode/skills/<skill-name>/SKILL.md`
 - `./.claude/skills/<skill-name>/SKILL.md`
 - `~/.claude/skills/<skill-name>/SKILL.md`
 
 Configuration priority:
 
-1. `~/.mini-code/settings.json`
-2. `~/.mini-code/mcp.json`
+1. `~/.oncecode/settings.json`
+2. `~/.oncecode/mcp.json`
 3. project `.mcp.json`
 4. compatible existing local settings
 5. process environment variables
 
 ## Skills and MCP Usage
 
-MiniCode supports two extension layers:
+OnceCode supports two extension layers:
 
 - `skills`: local workflow instructions, usually described by a `SKILL.md`
-- `MCP`: external tool providers that expose tools, resources, and prompts into MiniCode
+- `MCP`: external tool providers that expose tools, resources, and prompts into OnceCode
 
 ### Skills: install, inspect, trigger
 
 Install a local skill:
 
 ```bash
-minicode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
+oncecode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
 ```
 
 List installed or discovered skills:
 
 ```bash
-minicode skills list
+oncecode skills list
 ```
 
 Inside the interactive UI, you can also run:
@@ -318,7 +318,7 @@ Inside the interactive UI, you can also run:
 
 to inspect which skills are available in the current session.
 
-If you explicitly mention a skill name, MiniCode will prefer loading it. For example:
+If you explicitly mention a skill name, OnceCode will prefer loading it. For example:
 
 ```text
 Use the frontend-dev skill and directly rebuild the current landing page instead of stopping at a plan.
@@ -334,7 +334,7 @@ A common pattern is to clone an official or Claude Code-compatible skills repo l
 
 ```bash
 git clone https://github.com/MiniMax-AI/skills.git ~/minimax-skills
-minicode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
+oncecode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
 ```
 
 ### MCP: install, inspect, trigger
@@ -342,20 +342,20 @@ minicode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
 Install a user-scoped MCP server:
 
 ```bash
-minicode mcp add MiniMax --env MINIMAX_API_KEY=your-key --env MINIMAX_API_HOST=https://api.minimaxi.com -- uvx minimax-coding-plan-mcp -y
+oncecode mcp add MiniMax --env MINIMAX_API_KEY=your-key --env MINIMAX_API_HOST=https://api.minimaxi.com -- uvx minimax-coding-plan-mcp -y
 ```
 
 List configured MCP servers:
 
 ```bash
-minicode mcp list
+oncecode mcp list
 ```
 
 To configure an MCP server only for the current project, add `--project`:
 
 ```bash
-minicode mcp add filesystem --project -- npx -y @modelcontextprotocol/server-filesystem .
-minicode mcp list --project
+oncecode mcp add filesystem --project -- npx -y @modelcontextprotocol/server-filesystem .
+oncecode mcp list --project
 ```
 
 Inside the interactive UI, run:
@@ -377,7 +377,7 @@ For example, after connecting the MiniMax MCP server you may see:
 - `mcp__minimax__web_search`
 - `mcp__minimax__understand_image`
 
-These tool names are not hand-written in MiniCode. They appear automatically after a successful MCP connection.
+These tool names are not hand-written in OnceCode. They appear automatically after a successful MCP connection.
 
 ### How to use them in chat
 
@@ -413,14 +413,14 @@ A common combination is:
 
 ### Compatibility notes
 
-MiniCode currently focuses on:
+OnceCode currently focuses on:
 
 - local `SKILL.md` discovery with `load_skill`
 - stdio MCP servers
 - MCP tools
 - generic helper tools for MCP resources and prompts
 
-For vendor compatibility, MiniCode automatically tries:
+For vendor compatibility, OnceCode automatically tries:
 
 - standard `Content-Length` framing
 - then falls back to `newline-json` if needed
@@ -429,19 +429,13 @@ That means servers such as MiniMax MCP, which use newline-delimited JSON over st
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=LiuMengxuan04%2FMiniCode&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&legend=bottom-right" />
- </picture>
-</a>
+Star history can be added back once the public OnceCode repository URL is live.
 
-## Learn Claude Code Design Through MiniCode
+## Learn Claude Code Design Through OnceCode
 
 If you want to study the project as a learning resource, continue with:
 
-- [What Claude Code Design Ideas You Can Learn Through MiniCode](./CLAUDE_CODE_PATTERNS.md)
+- [What Claude Code Design Ideas You Can Learn Through OnceCode](./CLAUDE_CODE_PATTERNS.md)
 
 ## Project Structure
 
@@ -450,7 +444,7 @@ If you want to study the project as a learning resource, continue with:
 - `src/tool.ts`: tool registry and execution
 - `src/skills.ts`: local skill discovery and loading
 - `src/mcp.ts`: stdio MCP client and dynamic tool wrapping
-- `src/manage-cli.ts`: top-level `minicode mcp` / `minicode skills` management commands
+- `src/manage-cli.ts`: top-level `oncecode mcp` / `oncecode skills` management commands
 - `src/tools/*`: built-in tools
 - `src/tui/*`: terminal UI modules
 - `src/config.ts`: runtime configuration loading
@@ -459,17 +453,14 @@ If you want to study the project as a learning resource, continue with:
 ## Architecture Docs
 
 - [Architecture Overview](./ARCHITECTURE.md)
-- [中文架构说明](./ARCHITECTURE_ZH.md)
 
 ## Contributing
 
 - [Contribution Guidelines](./CONTRIBUTING.md)
-- [中文贡献规范](./CONTRIBUTING_ZH.md)
 
 ## Roadmap
 
 - [Roadmap](./ROADMAP.md)
-- [路线图（中文）](./ROADMAP_ZH.md)
 
 ## Development
 
@@ -477,4 +468,4 @@ If you want to study the project as a learning resource, continue with:
 npm run check
 ```
 
-MiniCode is intentionally small and pragmatic. The goal is to keep the architecture understandable, hackable, and easy to extend.
+OnceCode is intentionally small and pragmatic. The goal is to keep the architecture understandable, hackable, and easy to extend.

@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "vitest"],
+  "categories": {
+    "correctness": "error"
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.ts"],
+      "env": {
+        "node": true
+      },
+      "rules": {
+        "vitest/require-mock-type-parameters": "off"
+      }
+    },
+    {
+      "files": ["src/tui/**/*.ts", "tests/src/tui/**/*.ts"],
+      "rules": {
+        "no-control-regex": "off"
+      }
+    }
+  ]
+}

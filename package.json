@@ -1,15 +1,19 @@
 {
-  "name": "mini-code",
+  "name": "oncecode",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "minicode": "./bin/minicode"
+    "oncecode": "./bin/oncecode"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
     "check": "tsc --noEmit",
-    "install-local": "tsx src/install.ts"
+    "install-local": "tsx src/install.ts",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "diff": "^8.0.4",
@@ -17,7 +21,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
+    "oxlint": "^1.60.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.4"
   }
 }

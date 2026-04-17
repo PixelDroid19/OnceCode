@@ -1,10 +1,10 @@
 import {
   CLAUDE_SETTINGS_PATH,
-  MINI_CODE_MCP_PATH,
-  MINI_CODE_PERMISSIONS_PATH,
-  MINI_CODE_SETTINGS_PATH,
+  ONCECODE_MCP_PATH,
+  ONCECODE_PERMISSIONS_PATH,
+  ONCECODE_SETTINGS_PATH,
   loadRuntimeConfig,
-  saveMiniCodeSettings,
+  saveOnceCodeSettings,
 } from './config.js'
 import type { ToolRegistry } from './tool.js'
 
@@ -38,12 +38,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     name: '/model',
     usage: '/model <model-name>',
-    description: 'Persist a model override into ~/.mini-code/settings.json.',
+    description: 'Persist a model override into ~/.oncecode/settings.json.',
   },
   {
     name: '/config-paths',
     usage: '/config-paths',
-    description: 'Show mini-code and Claude fallback settings paths.',
+    description: 'Show OnceCode and Claude fallback settings paths.',
   },
   {
     name: '/skills',
@@ -58,12 +58,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     name: '/permissions',
     usage: '/permissions',
-    description: 'Show mini-code permission storage path.',
+    description: 'Show OnceCode permission storage path.',
   },
   {
     name: '/exit',
     usage: '/exit',
-    description: 'Exit mini-code.',
+    description: 'Exit OnceCode.',
   },
   {
     name: '/ls',
@@ -133,21 +133,21 @@ export async function tryHandleLocalCommand(
 
   if (input === '/config-paths') {
     return [
-      `mini-code settings: ${MINI_CODE_SETTINGS_PATH}`,
-      `mini-code permissions: ${MINI_CODE_PERMISSIONS_PATH}`,
-      `mini-code mcp: ${MINI_CODE_MCP_PATH}`,
+      `oncecode settings: ${ONCECODE_SETTINGS_PATH}`,
+      `oncecode permissions: ${ONCECODE_PERMISSIONS_PATH}`,
+      `oncecode mcp: ${ONCECODE_MCP_PATH}`,
       `compat fallback: ${CLAUDE_SETTINGS_PATH}`,
     ].join('\n')
   }
 
   if (input === '/permissions') {
-    return `permission store: ${MINI_CODE_PERMISSIONS_PATH}`
+    return `permission store: ${ONCECODE_PERMISSIONS_PATH}`
   }
 
   if (input === '/skills') {
     const skills = context?.tools?.getSkills() ?? []
     if (skills.length === 0) {
-      return 'No skills discovered. Add skills under ~/.mini-code/skills/<name>/SKILL.md, .mini-code/skills/<name>/SKILL.md, .claude/skills/<name>/SKILL.md, or ~/.claude/skills/<name>/SKILL.md.'
+      return 'No skills discovered. Add skills under ~/.oncecode/skills/<name>/SKILL.md, .oncecode/skills/<name>/SKILL.md, .claude/skills/<name>/SKILL.md, or ~/.claude/skills/<name>/SKILL.md.'
     }
 
     return skills
@@ -161,7 +161,7 @@ export async function tryHandleLocalCommand(
   if (input === '/mcp') {
     const servers = context?.tools?.getMcpServers() ?? []
     if (servers.length === 0) {
-      return 'No MCP servers configured. Add mcpServers to ~/.mini-code/settings.json, ~/.mini-code/mcp.json, or project .mcp.json.'
+      return 'No MCP servers configured. Add mcpServers to ~/.oncecode/settings.json, ~/.oncecode/mcp.json, or project .mcp.json.'
     }
 
     return servers
@@ -203,8 +203,8 @@ export async function tryHandleLocalCommand(
       return '用法: /model <model-name>'
     }
 
-    await saveMiniCodeSettings({ model })
-    return `saved model=${model} to ${MINI_CODE_SETTINGS_PATH}`
+    await saveOnceCodeSettings({ model })
+    return `saved model=${model} to ${ONCECODE_SETTINGS_PATH}`
   }
 
   return null

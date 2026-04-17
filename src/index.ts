@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   const permissions = new PermissionManager(cwd)
   await permissions.whenReady()
   const model =
-    process.env.MINI_CODE_MODEL_MODE === 'mock'
+    process.env.ONCECODE_MODEL_MODE === 'mock'
       ? new MockModelAdapter()
       : new AnthropicModelAdapter(tools, loadRuntimeConfig)
   let messages: ChatMessage[] = [

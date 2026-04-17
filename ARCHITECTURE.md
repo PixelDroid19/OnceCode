@@ -1,13 +1,11 @@
-# MiniCode Architecture
+# OnceCode Architecture
 
-[简体中文](./ARCHITECTURE_ZH.md)
-
-This document describes the lightweight architecture decisions behind `mini-code`.
+This document describes the lightweight architecture decisions behind `oncecode`.
 The goal is not to build a giant all-in-one terminal agent platform, but to prioritize the most valuable execution loop, interaction experience, and safety boundaries.
 
 ## Design Principles
 
-MiniCode prioritizes these capabilities:
+OnceCode prioritizes these capabilities:
 
 1. the main `model -> tool -> model` loop
 2. full-screen TUI interaction rhythm
@@ -15,7 +13,7 @@ MiniCode prioritizes these capabilities:
 4. a componentized transcript / tool / input UI structure
 5. a user-reviewable file modification flow
 
-In other words, MiniCode is a smaller, more controllable terminal coding assistant.
+In other words, OnceCode is a smaller, more controllable terminal coding assistant.
 
 ## Current implementation focus
 
@@ -44,8 +42,8 @@ In other words, MiniCode is a smaller, more controllable terminal coding assista
 - `src/agent-loop.ts`: multi-turn tool-calling loop
 - `src/tool.ts`: registration, validation, execution
 - `src/tools/*`: `list_files` / `grep_files` / `read_file` / `write_file` / `edit_file` / `patch_file` / `modify_file` / `run_command` / `web_fetch` / `web_search` / `ask_user` / `load_skill`
-- `src/config.ts`: uses dedicated `~/.mini-code`
-- `src/skills.ts`: scans `.mini-code/skills` and compatible `.claude/skills` directories
+- `src/config.ts`: uses dedicated `~/.oncecode`
+- `src/skills.ts`: scans `.oncecode/skills` and compatible `.claude/skills` directories
 - `src/mcp.ts`: launches stdio MCP servers, negotiates framing compatibility, and wraps remote MCP tools into local tool definitions
 - `src/background-tasks.ts`: minimal background shell task registry used by `run_command` and the TUI
 - `src/manage-cli.ts`: manages persisted MCP configs and installed local skills
@@ -57,7 +55,7 @@ In other words, MiniCode is a smaller, more controllable terminal coding assista
 
 ## Why it is good for learning
 
-One strength of MiniCode is that it delivers Claude Code–like behavior and core architectural ideas in a much lighter implementation.
+One strength of OnceCode is that it delivers Claude Code-like behavior and core architectural ideas in a much lighter implementation.
 
 That makes it well suited to:
 

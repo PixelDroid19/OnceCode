@@ -1,4 +1,4 @@
-# What Claude Code Design Ideas You Can Learn Through MiniCode
+# What Claude Code Design Ideas You Can Learn Through OnceCode
 
 ## 1. Agent Loop
 
@@ -14,9 +14,9 @@ Claude Code is centered on an agent loop:
 - feed results back into the model
 - stop only when the current turn can actually end
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode follows the same direction. The project is organized around a multi-step turn loop. The UI, tool layer, permissions, MCP, and skills are all shaped around that execution flow.
+OnceCode follows the same direction. The project is organized around a multi-step turn loop. The UI, tool layer, permissions, MCP, and skills are all shaped around that execution flow.
 
 ## 2. Structured Message Model
 
@@ -31,9 +31,9 @@ Claude Code does not treat the session as plain chat text. It distinguishes betw
 - tool results
 - compaction boundaries or summaries
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode also moved away from a plain transcript model. It now distinguishes between normal assistant output, progress, tool calls, tool results, and compacted context summaries.
+OnceCode also moved away from a plain transcript model. It now distinguishes between normal assistant output, progress, tool calls, tool results, and compacted context summaries.
 
 ## 3. Tool Use as a Protocol
 
@@ -47,9 +47,9 @@ In Claude Code, tool use is a protocol:
 - tool execution returns normalized results
 - results are fed back into the next reasoning step
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode uses the same structure. Tools are registered through one system, validated through schemas, executed through one entry point, and returned in a consistent format. Local tools and MCP-backed tools are both brought into the same execution model.
+OnceCode uses the same structure. Tools are registered through one system, validated through schemas, executed through one entry point, and returned in a consistent format. Local tools and MCP-backed tools are both brought into the same execution model.
 
 ## 4. Progress and Final Are Different States
 
@@ -57,9 +57,9 @@ MiniCode uses the same structure. Tools are registered through one system, valid
 
 Claude Code separates “still working” from “finished.” A process update is not treated as a final answer just because it is natural-language text.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode follows the same distinction. Intermediate execution text is treated as progress, rendered separately, and handled differently from final assistant output.
+OnceCode follows the same distinction. Intermediate execution text is treated as progress, rendered separately, and handled differently from final assistant output.
 
 ## 5. Permissions Belong Inside the Execution Path
 
@@ -67,9 +67,9 @@ MiniCode follows the same distinction. Intermediate execution text is treated as
 
 Claude Code treats permissions as part of the execution model itself. Risky operations such as command execution or file modification sit behind approval and review boundaries that are part of the system’s normal control flow.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode follows the same architectural choice. Command approval, review before writes, per-turn permission memory, and rejection feedback are all inside the turn loop.
+OnceCode follows the same architectural choice. Command approval, review before writes, per-turn permission memory, and rejection feedback are all inside the turn loop.
 
 ## 6. MCP as Dynamic Capability Injection
 
@@ -77,9 +77,9 @@ MiniCode follows the same architectural choice. Command approval, review before 
 
 The important idea behind MCP is that external servers can dynamically expose capabilities into the current agent session.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode takes the same approach. It reads MCP configuration, connects to external servers, discovers remote tools, and mounts them into the local tool surface. Resources and prompts are also exposed through a shared helper layer.
+OnceCode takes the same approach. It reads MCP configuration, connects to external servers, discovers remote tools, and mounts them into the local tool surface. Resources and prompts are also exposed through a shared helper layer.
 
 ## 7. Skills as Lightweight Workflow Extension
 
@@ -91,9 +91,9 @@ Claude Code skills act more like lightweight workflow extensions:
 - domain-specific execution constraints
 - reusable working patterns that can be loaded when needed
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode applies the same idea in a smaller form. Local `SKILL.md` files can be discovered and loaded into the execution flow, allowing the model to adopt a more specific workflow.
+OnceCode applies the same idea in a smaller form. Local `SKILL.md` files can be discovered and loaded into the execution flow, allowing the model to adopt a more specific workflow.
 
 ## 8. Automatic Context Compaction
 
@@ -101,9 +101,9 @@ MiniCode applies the same idea in a smaller form. Local `SKILL.md` files can be 
 
 Claude Code does not treat long-context management as simple deletion. Older context is compressed into a form that still supports continued work, while newer context remains available in higher fidelity.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode follows the same direction. When conversation state becomes too large, earlier messages can be summarized into a `context_summary`, and the recent tail is preserved.
+OnceCode follows the same direction. When conversation state becomes too large, earlier messages can be summarized into a `context_summary`, and the recent tail is preserved.
 
 ## 9. TUI as a State-Machine View
 
@@ -116,9 +116,9 @@ Claude Code’s terminal UI acts as a visualization of internal system state:
 - approval pending vs normal execution
 - compacted or summarized output where appropriate
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode’s TUI follows the same direction. It renders running tool states, progress messages, approval states, and collapsed tool summaries.
+OnceCode's TUI follows the same direction. It renders running tool states, progress messages, approval states, and collapsed tool summaries.
 
 ## 10. Foreground Tool Execution and Background Shell Tasks Are Different
 
@@ -126,9 +126,9 @@ MiniCode’s TUI follows the same direction. It renders running tool states, pro
 
 Claude Code does not treat every command as the same kind of synchronous tool call. Long-running shell commands that can outlive the current turn are modeled as separate tasks rather than being left hanging as ordinary unfinished tool executions.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode now follows that direction in a lightweight form. Explicitly backgrounded shell commands are no longer treated as ordinary synchronous `run_command` executions. They are registered as minimal background shell tasks and surfaced separately in the TUI. This is not a full clone of Claude Code’s task system, but it does preserve the design idea that foreground tool execution and background shell tasks should be modeled differently.
+OnceCode now follows that direction in a lightweight form. Explicitly backgrounded shell commands are no longer treated as ordinary synchronous `run_command` executions. They are registered as minimal background shell tasks and surfaced separately in the TUI. This is not a full clone of Claude Code's task system, but it does preserve the design idea that foreground tool execution and background shell tasks should be modeled differently.
 
 ## 11. Boundary Between Borrowing and Simplification
 
@@ -136,9 +136,9 @@ MiniCode now follows that direction in a lightweight form. Explicitly background
 
 Claude Code is a full product-scale system. Many of its design choices sit on top of larger state management, context handling, and interaction layers.
 
-### What MiniCode makes visible
+### What OnceCode makes visible
 
-MiniCode keeps the structural ideas rather than the full production footprint. What it keeps are the parts that shape the system most strongly:
+OnceCode keeps the structural ideas rather than the full production footprint. What it keeps are the parts that shape the system most strongly:
 
 - loop-first architecture
 - structured message handling
@@ -150,4 +150,4 @@ MiniCode keeps the structural ideas rather than the full production footprint. W
 - state-oriented terminal UI
 - a distinction between foreground tool execution and background shell tasks
 
-MiniCode is better understood as a small Claude Code-style reference implementation rather than as a full clone.
+OnceCode is better understood as a small Claude Code-style reference implementation rather than as a full clone.

@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="page_title">MiniCode | AI-powered terminal coding assistant</title>
-  <meta name="description" content="MiniCode is a lightweight terminal coding assistant for local development workflows. Model-tool-loop, secure approvals, Skills & MCP.">
+  <title data-i18n="page_title">OnceCode | AI-powered terminal coding assistant</title>
+  <meta name="description" content="OnceCode is a lightweight terminal coding assistant for local development workflows. Model-tool-loop, secure approvals, Skills & MCP.">
   
   <!-- Typography: Editorial Serif + Clean Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -616,14 +616,14 @@
   <nav class="navbar" id="navbar">
     <div class="container" style="display: flex; justify-content: space-between; align-items: center; gap: 48px;">
       <div class="brand" style="flex-shrink: 0;">
-        <img src="./logo.svg" alt="MiniCode Logo" style="width: 24px; height: 24px; border-radius: 4px;" />
-        MiniCode
+        <img src="./logo.svg" alt="OnceCode Logo" style="width: 24px; height: 24px; border-radius: 4px;" />
+        OnceCode
       </div>
       <div class="nav-links">
         <a href="#features" data-i18n="nav_features">Features</a>
         <a href="#architecture" data-i18n="nav_arch">Architecture</a>
         <button id="langToggle" class="lang-toggle">EN / 中</button>
-        <a href="https://github.com/LiuMengxuan04/MiniCode" target="_blank" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.85rem;" data-i18n="nav_github">GitHub</a>
+        <a href="../README.md" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.85rem;" data-i18n="nav_github">Project Docs</a>
       </div>
     </div>
   </nav>
@@ -633,31 +633,25 @@
     <!-- Hero Section -->
     <header class="hero container">
       <div class="hero-badge fade-up" data-i18n="badge_beta">
-        MiniCode Beta 1.0 is available
+        OnceCode Beta 1.0 is available
       </div>
       <h1 class="fade-up delay-100" data-i18n="hero_h1" data-html="true">
         AI-powered coding assistant <br>
         built for <em>developers</em>
       </h1>
       <p class="fade-up delay-200" data-i18n="hero_desc">
-        Work with large language models directly in your terminal. Build, debug, and ship with an execution loop that keeps you in control. Describe what you need, and MiniCode handles the tools.
+        Work with large language models directly in your terminal. Build, debug, and ship with an execution loop that keeps you in control. Describe what you need, and OnceCode handles the tools.
       </p>
       <div class="hero-actions fade-up delay-300">
-        <a class="btn btn-primary" href="https://github.com/LiuMengxuan04/MiniCode" target="_blank" data-i18n="btn_github">
-          View on GitHub
+        <a class="btn btn-primary" href="../README.md" data-i18n="btn_github">
+          Read README
         </a>
-        <a id="btn_readme" class="btn btn-secondary" href="https://github.com/LiuMengxuan04/MiniCode/blob/main/README.md" target="_blank" data-i18n="btn_readme">
-          Read Documentation
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/harkerhand/MiniCode-rs/tree/master" target="_blank" data-i18n="btn_rust">
-          Rust Version
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/QUSETIONS/MiniCode-Python" target="_blank" data-i18n="btn_python">
-          Python Version
+        <a id="btn_readme" class="btn btn-secondary" href="../ARCHITECTURE.md" data-i18n="btn_readme">
+          Architecture
         </a>
       </div>
       <p class="fade-up delay-300" data-i18n="multi_lang_note" style="margin-top: 16px; font-size: 0.95rem; color: var(--text-tertiary);">
-        Multi-language roadmap: Rust and Python versions are now available.
+        Multi-language roadmap: Rust and Python companion tracks are being documented separately.
       </p>
     </header>
 
@@ -667,11 +661,11 @@
         <!-- Top Panel: Header -->
         <div class="t-panel">
           <div class="t-panel-title">api.minimaxi.com</div>
-          <div class="t-header-title">MiniCode</div>
+          <div class="t-header-title">OnceCode</div>
           <div class="t-header-desc" data-i18n="t_header_desc">Terminal coding assistant with a card-style session layout.</div>
           
           <div class="t-stats-line">
-            <span class="t-stats-label">mini-code</span> <span class="t-stats-value">~/code/mini-code</span>
+            <span class="t-stats-label">oncecode</span> <span class="t-stats-value">~/code/oncecode</span>
             <span class="t-stats-label">[session]</span> <span class="t-stats-value">local</span>
             <span class="t-stats-label">[provider]</span> <span class="t-stats-value">api.minimaxi.com</span>
             <span class="t-stats-label">[model]</span> <span class="t-stats-value">MiniMax-M2.7</span>
@@ -680,7 +674,7 @@
             <span class="t-stats-label">[skills]</span> <span class="t-stats-value green">13</span>
             <span class="t-stats-label">[mcp]</span> <span class="t-stats-value">1</span>
           </div>
-          <div class="t-cwd">cwd: ~/code/mini-code | extra allowed dirs: ~/code/claude-code, ~/cod...</div>
+          <div class="t-cwd">cwd: ~/code/oncecode | extra allowed dirs: ~/code/claude-code, ~/cod...</div>
         </div>
 
         <!-- Middle Panel: Session Feed -->
@@ -690,7 +684,7 @@
           <div class="t-message" style="color: #5c7080;">.</div>
           
           <div class="t-role" data-i18n="t_role">assistant</div>
-          <div class="t-message" data-i18n="t_hello" data-html="true">Hello! 👋<br><br>I'm mini-code, your terminal coding assistant. I can help you with:</div>
+          <div class="t-message" data-i18n="t_hello" data-html="true">Hello! 👋<br><br>I'm oncecode, your terminal coding assistant. I can help you with:</div>
           <ul class="t-list">
             <li><span class="t-list-icon">🔍</span> <span data-i18n="t_l1">Inspecting code and repositories</span></li>
             <li><span class="t-list-icon">📝</span> <span data-i18n="t_l2">Writing, editing, and modifying files</span></li>
@@ -709,7 +703,7 @@
             <strong>prompt</strong> Enter send | /help commands | Esc clear | Ctrl+C exit
           </div>
           <div class="t-input-line">
-            <span class="t-input-prompt">mini-code&gt;</span>
+            <span class="t-input-prompt">oncecode&gt;</span>
             <span style="color: #8b949e;" data-i18n="t_input">Ask for code, files, tasks, or MCP tools</span><span class="t-input-cursor"></span>
           </div>
         </div>
@@ -736,7 +730,7 @@
       </div>
     </div>
 
-    <!-- Why MiniCode Section -->
+    <!-- Why OnceCode Section -->
     <section id="why" class="container" style="padding-top: 0; padding-bottom: 80px;">
       <div style="background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: 56px; box-shadow: var(--shadow-md); position: relative; overflow: hidden;">
         <!-- Decorative Background Circle -->
@@ -745,7 +739,7 @@
         <div style="position: relative; z-index: 1;">
           <h2 data-i18n="why_title" style="font-family: var(--font-serif); font-size: 2.2rem; font-weight: 400; margin-bottom: 20px; color: var(--text-primary);">Inspired by Claude Code</h2>
           <p data-i18n="why_desc" style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 40px; line-height: 1.7; max-width: 640px;">
-            MiniCode is designed as an architectural reference implementation. It intentionally strips away bloated platform features to focus entirely on the core AI-developer interaction loop. It is the perfect fit if you are looking for:
+            OnceCode is designed as an architectural reference implementation. It intentionally strips away bloated platform features to focus entirely on the core AI-developer interaction loop. It is the perfect fit if you are looking for:
           </p>
           
           <div class="grid" style="row-gap: 32px;">
@@ -784,7 +778,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
           <h3 data-i18n="feat_1_title">Core execution loop</h3>
-          <p data-i18n="feat_1_desc" data-html="true">MiniCode manages a full multi-step tool execution loop (<code>model -> tool -> model</code>) in a single turn, providing seamless context processing without leaving the terminal.</p>
+          <p data-i18n="feat_1_desc" data-html="true">OnceCode manages a full multi-step tool execution loop (<code>model -> tool -> model</code>) in a single turn, providing seamless context processing without leaving the terminal.</p>
           <ul class="feature-list">
             <li data-i18n="feat_1_l1">Full-screen TUI with transcript scrolling</li>
             <li data-i18n="feat_1_l2">Separation of progress and final answers</li>
@@ -797,7 +791,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
           <h3 data-i18n="feat_2_title">You're in control</h3>
-          <p data-i18n="feat_2_desc">Safety shouldn't be an afterthought. MiniCode brings permission validation and code review straight into the primary execution pathway.</p>
+          <p data-i18n="feat_2_desc">Safety shouldn't be an afterthought. OnceCode brings permission validation and code review straight into the primary execution pathway.</p>
           <ul class="feature-list">
             <li data-i18n="feat_2_l1">Standard Unified Diff view before writing</li>
             <li data-i18n="feat_2_l2">Path and command allowlist verification</li>
@@ -810,7 +804,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
           </div>
           <h3 data-i18n="feat_3_title">Skills & MCP</h3>
-          <p data-i18n="feat_3_desc" data-html="true">Extend capabilities endlessly. MiniCode discovers local <code>SKILL.md</code> instructions and seamlessly mounts stdio Model Context Protocol (MCP) servers.</p>
+          <p data-i18n="feat_3_desc" data-html="true">Extend capabilities endlessly. OnceCode discovers local <code>SKILL.md</code> instructions and seamlessly mounts stdio Model Context Protocol (MCP) servers.</p>
         </div>
 
         <div class="feature-card span-8 fade-up delay-100">
@@ -844,7 +838,7 @@
       <div class="container">
         <div class="section-header fade-up">
           <h2 data-i18n="arch_title">Architecture</h2>
-          <p data-i18n="arch_desc">MiniCode is not a bloated platform. It's a precisely structured codebase centered around the main execution loop.</p>
+          <p data-i18n="arch_desc">OnceCode is not a bloated platform. It's a precisely structured codebase centered around the main execution loop.</p>
         </div>
 
         <div class="arch-list">
@@ -877,8 +871,8 @@
         
         <div class="footer-brand">
           <h4>
-            <img src="./logo.svg" alt="MiniCode Logo" style="width: 18px; height: 18px; border-radius: 3px;" />
-            MiniCode
+            <img src="./logo.svg" alt="OnceCode Logo" style="width: 18px; height: 18px; border-radius: 3px;" />
+            OnceCode
           </h4>
           <p data-i18n="foot_desc">A lightweight terminal coding assistant for local development workflows. Built for learning, experimentation, and high efficiency.</p>
         </div>
@@ -887,29 +881,26 @@
           <h5 data-i18n="foot_prod">Product</h5>
           <a href="#features" data-i18n="nav_features">Features</a>
           <a href="#architecture" data-i18n="nav_arch">Architecture</a>
-          <a href="https://github.com/LiuMengxuan04/MiniCode/blob/main/ROADMAP.md" target="_blank" data-i18n="nav_roadmap">Roadmap</a>
+          <a href="../ROADMAP.md" data-i18n="nav_roadmap">Roadmap</a>
         </div>
 
         <div class="footer-col">
           <h5 data-i18n="foot_devs">Developers</h5>
-          <a href="https://github.com/LiuMengxuan04/MiniCode" target="_blank" data-i18n="nav_github">GitHub</a>
-          <a href="https://github.com/LiuMengxuan04/MiniCode/blob/main/ARCHITECTURE.md" target="_blank" data-i18n="foot_docs">Documentation</a>
-          <a href="https://github.com/LiuMengxuan04/MiniCode/blob/main/CLAUDE_CODE_PATTERNS.md" target="_blank" data-i18n="foot_patterns">Design Patterns</a>
+          <a href="../README.md" data-i18n="nav_github">Project Docs</a>
+          <a href="../ARCHITECTURE.md" data-i18n="foot_docs">Documentation</a>
+          <a href="../CLAUDE_CODE_PATTERNS.md" data-i18n="foot_patterns">Design Patterns</a>
         </div>
 
         <div class="footer-col">
           <h5 data-i18n="foot_comm">Community</h5>
-          <a href="https://github.com/LiuMengxuan04/MiniCode/blob/main/CONTRIBUTING.md" target="_blank" data-i18n="foot_contrib">Contributing</a>
-          <a href="https://github.com/LiuMengxuan04/MiniCode/issues" target="_blank" data-i18n="foot_report">Report an Issue</a>
+          <a href="../CONTRIBUTING.md" data-i18n="foot_contrib">Contributing</a>
         </div>
 
       </div>
 
       <div style="margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-        <p style="color: var(--text-tertiary); font-size: 0.85rem;" data-i18n="foot_rights">© 2026 MiniCode. MIT Licensed.</p>
-        <a href="https://www.star-history.com/#LiuMengxuan04/MiniCode&Date" target="_blank">
-          <img class="star-img" style="margin-top: 0; max-height: 40px;" alt="MiniCode Star History" src="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&style=flat" />
-        </a>
+        <p style="color: var(--text-tertiary); font-size: 0.85rem;" data-i18n="foot_rights">© 2026 OnceCode. MIT Licensed.</p>
+        <p style="color: var(--text-tertiary); font-size: 0.85rem;">Public repository and star history links can be added once the OnceCode URLs are live.</p>
       </div>
     </div>
   </footer>
@@ -918,24 +909,22 @@
     // I18n Dictionary
     const i18n = {
       en: {
-        page_title: "MiniCode | AI-powered terminal coding assistant",
+        page_title: "OnceCode | AI-powered terminal coding assistant",
         nav_features: "Features",
         nav_arch: "Architecture",
         nav_roadmap: "Roadmap",
-        nav_github: "GitHub",
-        badge_beta: "MiniCode Beta 1.0 is available",
+        nav_github: "Project Docs",
+        badge_beta: "OnceCode Beta 1.0 is available",
         hero_h1: "AI-powered coding assistant <br> built for <em>developers</em>",
-        hero_desc: "Work with large language models directly in your terminal. Build, debug, and ship with an execution loop that keeps you in control. Describe what you need, and MiniCode handles the tools.",
-        btn_github: "View on GitHub",
-        btn_readme: "Read Documentation",
-        btn_rust: "Rust Version",
-        btn_python: "Python Version",
-        multi_lang_note: "Multi-language roadmap: Rust and Python versions are now available.",
+        hero_desc: "Work with large language models directly in your terminal. Build, debug, and ship with an execution loop that keeps you in control. Describe what you need, and OnceCode handles the tools.",
+        btn_github: "Read README",
+        btn_readme: "Architecture",
+        multi_lang_note: "Multi-language roadmap: Rust and Python companion tracks are being documented separately.",
         t_header_desc: "Terminal coding assistant with a card-style session layout.",
         t_events: "2 events",
         t_feed: "session feed",
         t_role: "assistant",
-        t_hello: "Hello! 👋<br><br>I'm mini-code, your terminal coding assistant. I can help you with:",
+        t_hello: "Hello! 👋<br><br>I'm oncecode, your terminal coding assistant. I can help you with:",
         t_l1: "Inspecting code and repositories",
         t_l2: "Writing, editing, and modifying files",
         t_l3: "Running development commands",
@@ -954,8 +943,8 @@
         tech_3: "MCP Protocol",
         tech_4: "Diff Review",
         tech_5: "Local Skills",
-        why_title: "Why MiniCode?",
-        why_desc: "MiniCode heavily borrows design patterns from Claude Code, stripping away bloated platform features to focus entirely on the core AI-developer interaction loop. It is the perfect fit if you are looking for:",
+        why_title: "Why OnceCode?",
+        why_desc: "OnceCode heavily borrows design patterns from Claude Code, stripping away bloated platform features to focus entirely on the core AI-developer interaction loop. It is the perfect fit if you are looking for:",
         why_1_h: "A lightweight assistant",
         why_1_p: "Instead of a heavy IDE platform, getting a standalone assistant focused purely on the coding workflow.",
         why_2_h: "Clean terminal UI",
@@ -967,21 +956,21 @@
         feat_title: "Meets you where you code",
         feat_desc: "A minimalist design focusing on the core tool-calling execution loop, providing safety and high extensibility.",
         feat_1_title: "Core execution loop",
-        feat_1_desc: "MiniCode manages a full multi-step tool execution loop (<code>model -> tool -> model</code>) in a single turn, providing seamless context processing without leaving the terminal.",
+        feat_1_desc: "OnceCode manages a full multi-step tool execution loop (<code>model -> tool -> model</code>) in a single turn, providing seamless context processing without leaving the terminal.",
         feat_1_l1: "Full-screen TUI with transcript scrolling",
         feat_1_l2: "Separation of progress and final answers",
         feat_1_l3: "Feedback injection upon rejection",
         feat_2_title: "You're in control",
-        feat_2_desc: "Safety shouldn't be an afterthought. MiniCode brings permission validation and code review straight into the primary execution pathway.",
+        feat_2_desc: "Safety shouldn't be an afterthought. OnceCode brings permission validation and code review straight into the primary execution pathway.",
         feat_2_l1: "Standard Unified Diff view before writing",
         feat_2_l2: "Path and command allowlist verification",
         feat_2_l3: "Interception of dangerous actions with responsive approval controls",
         feat_3_title: "Skills & MCP",
-        feat_3_desc: "Extend capabilities endlessly. MiniCode discovers local <code>SKILL.md</code> instructions and seamlessly mounts stdio Model Context Protocol (MCP) servers.",
+        feat_3_desc: "Extend capabilities endlessly. OnceCode discovers local <code>SKILL.md</code> instructions and seamlessly mounts stdio Model Context Protocol (MCP) servers.",
         feat_4_title: "Built-in Toolchain",
         feat_4_desc: "Local file ops, command execution (including single-string calls like <code>git status</code>), structured user clarification via <code>ask_user</code>, and full MCP helpers are centralized through one standardized tool protocol.",
         arch_title: "Architecture",
-        arch_desc: "MiniCode is not a bloated platform. It's a precisely structured codebase centered around the main execution loop.",
+        arch_desc: "OnceCode is not a bloated platform. It's a precisely structured codebase centered around the main execution loop.",
         arch_1_desc: "The core multi-turn tool-calling loop that drives the entire asynchronous conversational logic.",
         arch_2_desc: "The security sentinel handling path allowlists, command reviews, and intercepting unauthorized writes.",
         arch_3_desc: "The external connector managing MCP client connections and wrapping remote tool functions for local execution.",
@@ -994,96 +983,23 @@
         foot_patterns: "Design Patterns",
         foot_contrib: "Contributing",
         foot_report: "Report an Issue",
-        foot_rights: "© 2026 MiniCode. MIT Licensed."
-      },
-      zh: {
-        page_title: "MiniCode | 极简终端 AI 编码助手",
-        nav_features: "核心特性",
-        nav_arch: "架构地图",
-        nav_roadmap: "演进路线",
-        nav_github: "GitHub",
-        badge_beta: "MiniCode Beta 1.0 现已发布",
-        hero_h1: "专为 <em>开发者</em> 构建的<br>终端 AI 助手",
-        hero_desc: "在终端中直接与 LLM 协同工作。把终端助手做「小」，但把核心闭环做「全」：保留核心的 model-tool-loop 和拦截修改流，随时掌控每一次执行。",
-        btn_github: "访问 GitHub",
-        btn_readme: "阅读中文文档",
-        btn_rust: "Rust 版本",
-        btn_python: "Python 版本",
-        multi_lang_note: "多语言路线：Rust 与 Python 版本均已上线。",
-        t_header_desc: "采用卡片式会话布局的终端编码助手。",
-        t_events: "2 条事件",
-        t_feed: "会话内容",
-        t_role: "assistant",
-        t_hello: "你好！👋<br><br>我是 mini-code，你的终端编码助手。我可以帮你：",
-        t_l1: "审查代码和工程目录",
-        t_l2: "编写、编辑与修改文件",
-        t_l3: "运行常见的开发命令",
-        t_l4: "生成图像（通过 MiniMax AI）",
-        t_l5: "处理多种文档格式（PDF, DOCX, XLSX, PPTX）",
-        t_l6: "遵循并执行技能流（前端开发、全栈开发、Flutter 开发等）",
-        t_ask: "今天你想开发点什么？",
-        t_prompt: "输入",
-        t_hints: "<strong>输入栏</strong> Enter 发送 | /help 命令列表 | Esc 清空 | Ctrl+C 退出",
-        t_input: "询问代码、文件、任务或 MCP 工具",
-        t_ready: "就绪",
-        t_tools: "工具 <span>已开启</span> | 技能 <span>已开启</span>",
-        tech_strip: "构建于现代架构之上",
-        tech_1: "模型-工具-闭环",
-        tech_2: "TUI 终端界面",
-        tech_3: "MCP 协议扩展",
-        tech_4: "Diff 变更审查",
-        tech_5: "本地工作流指令",
-        why_title: "为什么选择 MiniCode",
-        why_desc: "MiniCode 深度借鉴了 Claude Code 的设计模式，剥离了臃肿的平台级特性，专一地打磨底层 AI 开发者的交互循环。如果你希望得到下面这些东西，MiniCode 会非常合适：",
-        why_1_h: "一个轻量的助手",
-        why_1_p: "而不是庞大的 IDE 平台。一个单纯为 Coding Agent 工作流打造的独立组件。",
-        why_2_h: "干净的终端 UI",
-        why_2_p: "自带原生 Tool calling、对话日志滚动机制和完整的命令执行工作流。",
-        why_3_h: "极具阅读性的代码库",
-        why_3_p: "去芜存菁，结构紧凑。极其适合作为实验基座、二次开发或定制私有助理的地基。",
-        why_4_h: "一个参考级架构实现",
-        why_4_p: "可用于深度学习类似 Claude Code 这种现代 Agent Loop 的底层是如何运转的。",
-        feat_title: "契合你的本地工作流",
-        feat_desc: "极简的架构设计，专注于底层工具调用的执行闭环。摒弃臃肿，保留高扩展性与安全纯粹。",
-        feat_1_title: "核心工作流循环",
-        feat_1_desc: "实现完整的单轮多步工具调用（<code>model -> tool -> model</code>），无需离开终端，无缝提供连续的上下文推理闭环。",
-        feat_1_l1: "全屏 TUI 界面与运行日志滚动",
-        feat_1_l2: "执行过程 (Progress) 与最终结果分离",
-        feat_1_l3: "支持拒绝执行并反馈修正建议给模型",
-        feat_2_title: "安全且可控的边界",
-        feat_2_desc: "安全不能只是附加项。MiniCode 巧妙地将权限验证和代码 Diff 审查置入了主执行链路内，而非外围补丁。",
-        feat_2_l1: "写入代码前展示标准 Unified Diff 进行确认",
-        feat_2_l2: "基于白名单规则的路径与命令审查",
-        feat_2_l3: "从框架底层拦截危险操作，并保持审批交互稳定可控",
-        feat_3_title: "Skills & MCP 无限扩展",
-        feat_3_desc: "拥抱生态标准。MiniCode 可自动发现 <code>SKILL.md</code> 组织的工作流，并无缝挂载标准的 stdio MCP 服务器，无穷扩展能力边界。",
-        feat_4_title: "内置底层工具链",
-        feat_4_desc: "本地文件操作、Shell 命令执行（含 <code>git status</code> 这类单字符串命令）、通过 <code>ask_user</code> 的结构化澄清，以及完整 MCP helper，统一收口到标准化工具协议。",
-        arch_title: "核心架构地图",
-        arch_desc: "MiniCode 不是一个“大而全”的平台。它是一个高度克制、围绕主循环结构化裁剪的极简基座代码库。",
-        arch_1_desc: "多步模型/工具循环引擎，驱动整个终端异步对话交互的心脏。",
-        arch_2_desc: "核心安全哨兵组件。负责处理路径验证、命令限制审查以及写入操作的阻断拦截。",
-        arch_3_desc: "外部能力连接器。管理 MCP Client 的标准连接，并负责将远端工具动态映射封装为本地可调用工具。",
-        arch_4_desc: "极其轻量的任务驻留管理器。有效区分前台的单次工具调用与后台的长效常驻进程（如 Webpack Dev 服务器）。",
-        foot_desc: "面向本地开发工作流的轻量终端 AI 编码助手。专为学习、实验设计与高效能代码创作而构建。",
-        foot_prod: "产品",
-        foot_devs: "开发者",
-        foot_comm: "社区",
-        foot_docs: "架构文档",
-        foot_patterns: "设计模式",
-        foot_contrib: "贡献指南",
-        foot_report: "提交问题反馈",
-        foot_rights: "© 2026 MiniCode. 遵循 MIT 开源协议。"
+        foot_rights: "© 2026 OnceCode. MIT Licensed."
       }
     };
 
+    const availableLanguages = Object.keys(i18n);
+
+    function getSupportedLanguage(lang) {
+      return availableLanguages.includes(lang) ? lang : 'en';
+    }
+
     // Current language state
-    let currentLang = localStorage.getItem('minicode_lang') || 'en';
+    let currentLang = getSupportedLanguage(localStorage.getItem('oncecode_lang') || 'en');
 
     // Update UI based on dictionary
     function updateContent() {
       const elements = document.querySelectorAll('[data-i18n]');
-      const dict = i18n[currentLang];
+      const dict = i18n[getSupportedLanguage(currentLang)];
       
       elements.forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -1102,26 +1018,28 @@
       // Update toggle button text if needed
       const btn = document.getElementById('langToggle');
       if (btn) {
+        btn.hidden = availableLanguages.length < 2;
         btn.textContent = currentLang === 'en' ? 'EN / 中' : '中 / EN';
       }
       
       // Update README link correctly based on language
       const readmeBtn = document.getElementById('btn_readme');
       if (readmeBtn) {
-        if (currentLang === 'zh') {
-          readmeBtn.href = "https://github.com/LiuMengxuan04/MiniCode/blob/main/README.zh-CN.md";
-        } else {
-          readmeBtn.href = "https://github.com/LiuMengxuan04/MiniCode/blob/main/README.md";
-        }
+          readmeBtn.href = "../ARCHITECTURE.md";
       }
     }
 
     // Toggle Language Handler
-    document.getElementById('langToggle').addEventListener('click', () => {
-      currentLang = currentLang === 'en' ? 'zh' : 'en';
-      localStorage.setItem('minicode_lang', currentLang);
-      updateContent();
-    });
+    const langToggle = document.getElementById('langToggle');
+    if (langToggle && availableLanguages.length > 1) {
+      langToggle.addEventListener('click', () => {
+        const currentIndex = availableLanguages.indexOf(currentLang);
+        const nextIndex = (currentIndex + 1) % availableLanguages.length;
+        currentLang = availableLanguages[nextIndex];
+        localStorage.setItem('oncecode_lang', currentLang);
+        updateContent();
+      });
+    }
 
     // Navbar Scroll Effect and Initialization
     document.addEventListener("DOMContentLoaded", () => {

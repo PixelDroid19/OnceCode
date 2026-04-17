@@ -1,6 +1,6 @@
-# MiniCode Roadmap
+# OnceCode Roadmap
 
-MiniCode already has a usable lightweight terminal coding workflow, but there is still a visible gap between the current `main` branch and a more complete Claude Code-like runtime.
+OnceCode already has a usable lightweight terminal coding workflow, but there is still a visible gap between the current `main` branch and a more complete Claude Code-like runtime.
 
 This roadmap highlights the most valuable missing capabilities and the order in which they should ideally be improved.
 
@@ -21,17 +21,17 @@ It includes:
 - context usage display in the TUI
 - automatic context compaction for long conversations
 
-This work matters because long-session stability depends on it. It is also one of the most important design areas where MiniCode still trails a more complete Claude Code-style runtime.
+This work matters because long-session stability depends on it. It is also one of the most important design areas where OnceCode still trails a more complete Claude Code-style runtime.
 
 ### 2. API retry and backoff
 
-**Status: implemented.** The main Anthropic adapter retries on 429 and 5xx with exponential backoff and honors `Retry-After` when present. The companion [Python](./external/MiniCode-Python/) and [Rust](./external/MiniCode-rs/) ports follow the same behavior.
+**Status: implemented.** The main Anthropic adapter retries on 429 and 5xx with exponential backoff and honors `Retry-After` when present. The companion Python and Rust implementations follow the same behavior.
 
 Possible follow-ups include a more uniform configurable retry policy, richer observability, or applying the same policy consistently across additional provider code paths.
 
 ### 3. Session persistence and resume
 
-MiniCode should be able to save and resume sessions reliably.
+OnceCode should be able to save and resume sessions reliably.
 
 This includes:
 
@@ -45,7 +45,7 @@ This is important for real-world usage and longer task execution.
 
 **Status: Python and Rust companion implementations are available; Go remains exploratory.**
 
-Another important direction is to explore parallel implementations of MiniCode in other languages, especially:
+Another important direction is to explore parallel implementations of OnceCode in other languages, especially:
 
 - Python (companion repo available)
 - Go (no formal companion implementation yet)
@@ -66,7 +66,7 @@ If you are interested in maintaining or extending the Python or Rust variants, o
 
 ### 5. Layered memory loading
 
-MiniCode should support a lightweight memory hierarchy similar in spirit to Claude Code's layered project context.
+OnceCode should support a lightweight memory hierarchy similar in spirit to Claude Code's layered project context.
 
 This may include:
 
@@ -77,7 +77,7 @@ This may include:
 
 ### 6. Stronger provider abstraction
 
-MiniCode currently works well with Anthropic-style APIs and some compatible providers, but the provider model can be made more explicit and complete.
+OnceCode currently works well with Anthropic-style APIs and some compatible providers, but the provider model can be made more explicit and complete.
 
 Target direction:
 
@@ -100,7 +100,7 @@ It is worth doing after the core runtime is more stable.
 
 ### 9. Expand the core toolset selectively
 
-MiniCode does not need to chase Claude Code's full tool count mechanically, but it does need to expand beyond the current minimal set over time.
+OnceCode does not need to chase Claude Code's full tool count mechanically, but it does need to expand beyond the current minimal set over time.
 
 The direction here should be:
 
@@ -116,7 +116,7 @@ Priority should go to missing core tool categories such as:
 - lightweight task tracking
 - a few high-value built-in tools where MCP is not a sufficient substitute
 
-The goal is not tool-count parity. The goal is a stronger core toolset while preserving MiniCode's lightweight identity.
+The goal is not tool-count parity. The goal is a stronger core toolset while preserving OnceCode's lightweight identity.
 
 ## P2
 
@@ -126,7 +126,7 @@ Useful, but not essential for the main terminal coding workflow.
 
 ### 10. Built-in web tools
 
-MiniCode can already extend itself through MCP, so built-in `WebFetch` / `WebSearch` are useful but not the most urgent gap.
+OnceCode can already extend itself through MCP, so built-in `WebFetch` / `WebSearch` are useful but not the most urgent gap.
 
 ### 11. Evaluation and trace infrastructure
 
@@ -154,4 +154,3 @@ If you want to contribute in these areas:
 See:
 
 - [Contribution Guidelines](./CONTRIBUTING.md)
-- [中文贡献规范](./CONTRIBUTING_ZH.md)

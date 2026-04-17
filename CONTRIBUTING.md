@@ -1,8 +1,8 @@
-# Contributing to MiniCode
+# Contributing to OnceCode
 
-Thanks for contributing to MiniCode.
+Thanks for contributing to OnceCode.
 
-MiniCode welcomes pull requests, but the project has a clear scope: it is meant to stay small, readable, and close in spirit to Claude Code's core design direction.
+OnceCode welcomes pull requests, but the project has a clear scope: it is meant to stay small, readable, and close in spirit to Claude Code's core design direction.
 
 This document explains the baseline expectations for contributions.
 
@@ -12,7 +12,7 @@ This document explains the baseline expectations for contributions.
 
 Please avoid introducing overly complex design changes.
 
-MiniCode is intentionally small. New contributions should preserve:
+OnceCode is intentionally small. New contributions should preserve:
 
 - a compact codebase
 - direct control flow
@@ -31,7 +31,7 @@ That does not mean copying everything mechanically. It means:
 - preserve the same mental model when adapting a feature
 - avoid introducing product behavior that clearly diverges from the Claude Code style without a strong reason
 
-MiniCode is a lightweight adaptation, not an unrelated terminal agent project.
+OnceCode is a lightweight adaptation, not an unrelated terminal agent project.
 
 ## Contribution Expectations
 
@@ -57,7 +57,7 @@ When changing the CLI, TUI, tool loop, permissions, MCP handling, or skills beha
 
 ### 5. Keep safety boundaries intact
 
-MiniCode includes important safety boundaries around:
+OnceCode includes important safety boundaries around:
 
 - file modification review
 - path access
@@ -97,7 +97,6 @@ If a PR changes user-facing behavior, please update the relevant documentation.
 This may include:
 
 - `README.md`
-- `README.zh-CN.md`
 - architecture docs
 - new command or configuration examples
 
@@ -143,7 +142,7 @@ Contributions are especially welcome in areas such as:
 These kinds of changes usually need a stronger justification:
 
 - large rewrites that increase architecture complexity significantly
-- features that move MiniCode away from Claude Code's design direction
+- features that move OnceCode away from Claude Code's design direction
 - new layers of abstraction with little practical payoff
 - heavy dependency additions for relatively small gains
 - behavior changes that make the project harder to study or modify
@@ -160,4 +159,4 @@ A good PR description should briefly explain:
 - how it was verified
 - how reviewers can reproduce and verify the change locally
 
-Thanks again for helping improve MiniCode while keeping the project focused.
+Thanks again for helping improve OnceCode while keeping the project focused.
