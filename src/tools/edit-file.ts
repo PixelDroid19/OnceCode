@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { applyReviewedFileChange } from '../file-review.js'
 import type { ToolDefinition } from '../tool.js'
 import { resolveToolPath } from '../workspace.js'
+import { applyReplacements } from './search-replace.js'
 
 type Input = {
   path: string
@@ -34,17 +35,15 @@ export const editFileTool: ToolDefinition<Input> = {
     const target = await resolveToolPath(context, input.path, 'write')
     const original = await readFile(target, 'utf8')
 
-    if (!original.includes(input.search)) {
-      return {
-        ok: false,
-        output: `Text not found in ${input.path}`,
-      }
+    const result = applyReplacements(
+      original,
+      [{ search: input.search, replace: input.replace, replaceAll: input.replaceAll }],
+      input.path,
+    )
+    if (!result.ok) {
+      return { ok: false, output: `Text not found in ${input.path}` }
     }
 
-    const next = input.replaceAll
-      ? original.split(input.search).join(input.replace)
-      : original.replace(input.search, input.replace)
-
-    return applyReviewedFileChange(context, input.path, target, next)
+    return applyReviewedFileChange(context, input.path, target, result.content)
   },
 }

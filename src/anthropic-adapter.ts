@@ -2,10 +2,16 @@ import type { ToolRegistry } from './tool.js'
 import type { ChatMessage, ModelAdapter, StepDiagnostics, ToolCall } from './types.js'
 import type { RuntimeConfig } from './config.js'
 import { resolveMaxOutputTokens } from './utils/context.js'
+import {
+  extractErrorMessage,
+  getRetryDelayMs,
+  parseRetryAfterMs,
+  readJsonBody,
+  shouldRetryStatus,
+  sleep,
+} from './utils/http.js'
 
 const DEFAULT_MAX_RETRIES = 4
-const BASE_RETRY_DELAY_MS = 500
-const MAX_RETRY_DELAY_MS = 8_000
 
 type AnthropicContentBlock =
   | { type: 'text'; text: string }
@@ -18,101 +24,12 @@ type AnthropicMessage = {
   content: AnthropicContentBlock[]
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, Math.max(0, ms))
-  })
-}
-
 function getRetryLimit(): number {
   const value = Number(process.env.ONCECODE_MAX_RETRIES)
   if (!Number.isFinite(value) || value < 0) {
     return DEFAULT_MAX_RETRIES
   }
   return Math.floor(value)
-}
-
-function shouldRetryStatus(status: number): boolean {
-  return status === 429 || (status >= 500 && status < 600)
-}
-
-function parseRetryAfterMs(retryAfter: string | null): number | null {
-  if (!retryAfter) return null
-  const asSeconds = Number(retryAfter)
-  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
-    return Math.floor(asSeconds * 1000)
-  }
-
-  const at = Date.parse(retryAfter)
-  if (!Number.isFinite(at)) {
-    return null
-  }
-  return Math.max(0, at - Date.now())
-}
-
-function getRetryDelayMs(attempt: number, retryAfterMs: number | null): number {
-  if (retryAfterMs !== null) {
-    return retryAfterMs
-  }
-  const base = Math.min(
-    BASE_RETRY_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1)),
-    MAX_RETRY_DELAY_MS,
-  )
-  const jitter = Math.random() * 0.25 * base
-  return Math.floor(base + jitter)
-}
-
-async function readJsonBody(response: Response): Promise<unknown> {
-  const text = await response.text()
-  if (!text.trim()) {
-    return {}
-  }
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { error: { message: text.trim() } }
-  }
-}
-
-function extractErrorMessage(data: unknown, status: number): string {
-  if (typeof data === 'string' && data.trim()) {
-    return data.trim()
-  }
-
-  if (
-    typeof data === 'object' &&
-    data !== null &&
-    'error' in data &&
-    typeof data.error === 'object' &&
-    data.error !== null &&
-    'message' in data.error &&
-    typeof data.error.message === 'string' &&
-    data.error.message.trim()
-  ) {
-    return data.error.message.trim()
-  }
-
-  if (
-    typeof data === 'object' &&
-    data !== null &&
-    'error' in data &&
-    typeof data.error === 'string' &&
-    data.error.trim()
-  ) {
-    return data.error.trim()
-  }
-
-  if (
-    typeof data === 'object' &&
-    data !== null &&
-    'message' in data &&
-    typeof data.message === 'string' &&
-    data.message.trim()
-  ) {
-    return data.message.trim()
-  }
-
-  return `Model request failed: ${status}`
 }
 
 function isTextBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {

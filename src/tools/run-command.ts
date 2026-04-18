@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { z } from 'zod'
 import { registerBackgroundShellTask } from '../background-tasks.js'
 import type { ToolDefinition } from '../tool.js'
+import { splitCommandLine } from '../utils/command-line.js'
 import { resolveToolPath } from '../workspace.js'
 
 const execFileAsync = promisify(execFile)
@@ -52,60 +53,6 @@ type Input = {
   command: string
   args?: string[]
   cwd?: string
-}
-
-function splitCommandLine(commandLine: string): string[] {
-  const parts: string[] = []
-  let current = ''
-  let quote: '"' | "'" | null = null
-  let escaping = false
-
-  for (const char of commandLine) {
-    if (escaping) {
-      current += char
-      escaping = false
-      continue
-    }
-
-    if (char === '\\') {
-      escaping = true
-      continue
-    }
-
-    if (quote) {
-      if (char === quote) {
-        quote = null
-      } else {
-        current += char
-      }
-      continue
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char
-      continue
-    }
-
-    if (/\s/.test(char)) {
-      if (current.length > 0) {
-        parts.push(current)
-        current = ''
-      }
-      continue
-    }
-
-    current += char
-  }
-
-  if (escaping) {
-    current += '\\'
-  }
-
-  if (current.length > 0) {
-    parts.push(current)
-  }
-
-  return parts
 }
 
 function normalizeCommandInput(input: Input): {

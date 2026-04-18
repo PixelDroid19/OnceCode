@@ -1,3 +1,5 @@
+import { splitCommandLine } from './utils/command-line.js'
+
 export type LocalToolShortcut =
   | { toolName: 'list_files'; input: { path?: string } }
   | { toolName: 'grep_files'; input: { pattern: string; path?: string } }
@@ -92,7 +94,7 @@ export function parseLocalToolShortcut(input: string): LocalToolShortcut | null 
     const splitAt = payload.indexOf('::')
     const commandText = splitAt === -1 ? payload : payload.slice(splitAt + 2).trim()
     const commandCwd = splitAt === -1 ? undefined : payload.slice(0, splitAt).trim()
-    const parts = commandText.split(/\s+/)
+    const parts = splitCommandLine(commandText)
     const [command, ...args] = parts
     if (!command) return null
     return {

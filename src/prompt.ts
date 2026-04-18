@@ -1,16 +1,8 @@
-import { readFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { McpServerSummary } from './mcp.js'
 import type { SkillSummary } from './skills.js'
-
-async function maybeRead(filePath: string): Promise<string | null> {
-  try {
-    return await readFile(filePath, 'utf8')
-  } catch {
-    return null
-  }
-}
+import { readTextFileOrNull } from './utils/fs.js'
 
 export async function buildSystemPrompt(
   cwd: string,
@@ -20,8 +12,8 @@ export async function buildSystemPrompt(
     mcpServers?: McpServerSummary[]
   },
 ): Promise<string> {
-  const globalClaudeMd = await maybeRead(path.join(os.homedir(), '.claude', 'CLAUDE.md'))
-  const projectClaudeMd = await maybeRead(path.join(cwd, 'CLAUDE.md'))
+  const globalClaudeMd = await readTextFileOrNull(path.join(os.homedir(), '.claude', 'CLAUDE.md'))
+  const projectClaudeMd = await readTextFileOrNull(path.join(cwd, 'CLAUDE.md'))
 
   const parts = [
     'You are OnceCode, a terminal coding assistant.',

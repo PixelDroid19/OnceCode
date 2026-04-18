@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { isEnoentError } from './utils/errors.js'
+import { readTextFileOrNull } from './utils/fs.js'
 import type { McpConfigScope, McpServerConfig, OnceCodeSettings } from './config.js'
 
 export const ONCECODE_DIR = path.join(os.homedir(), '.oncecode')
@@ -12,18 +12,6 @@ export const ONCECODE_MCP_PATH = path.join(ONCECODE_DIR, 'mcp.json')
 export const ONCECODE_MCP_TOKENS_PATH = path.join(ONCECODE_DIR, 'mcp-tokens.json')
 export const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json')
 export const PROJECT_MCP_PATH = path.join(process.cwd(), '.mcp.json')
-
-async function readTextFileOrNull(filePath: string): Promise<string | null> {
-  try {
-    return await readFile(filePath, 'utf8')
-  } catch (error) {
-    if (isEnoentError(error)) {
-      return null
-    }
-
-    throw error
-  }
-}
 
 export async function readSettingsFile(filePath: string): Promise<OnceCodeSettings> {
   const content = await readTextFileOrNull(filePath)

@@ -1,6 +1,7 @@
 import type { McpServerConfig, RuntimeConfig } from '../config.js'
 import type { McpServerSummary } from '../mcp.js'
 import { createMcpBackedTools } from '../mcp.js'
+import { summarizeServerEndpoint } from '../mcp-tool-utils.js'
 import { discoverSkills } from '../skills.js'
 import { ToolRegistry } from '../tool.js'
 import { askUserTool } from './ask-user.js'
@@ -15,14 +16,6 @@ import { runCommandTool } from './run-command.js'
 import { webFetchTool } from './web-fetch.js'
 import { webSearchTool } from './web-search.js'
 import { writeFileTool } from './write-file.js'
-
-function summarizeServerEndpoint(config: McpServerConfig): string {
-  const remoteUrl = config.url?.trim()
-  if (remoteUrl) return remoteUrl
-  const command = config.command?.trim() ?? ''
-  const args = config.args?.join(' ') ?? ''
-  return `${command} ${args}`.trim()
-}
 
 function buildConnectingMcpSummaries(
   mcpServers: Record<string, McpServerConfig>,

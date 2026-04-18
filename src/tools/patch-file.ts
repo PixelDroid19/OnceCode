@@ -3,12 +3,7 @@ import { z } from 'zod'
 import { applyReviewedFileChange } from '../file-review.js'
 import type { ToolDefinition } from '../tool.js'
 import { resolveToolPath } from '../workspace.js'
-
-type Replacement = {
-  search: string
-  replace: string
-  replaceAll?: boolean
-}
+import { applyReplacements, type Replacement } from './search-replace.js'
 
 type Input = {
   path: string
@@ -49,36 +44,21 @@ export const patchFileTool: ToolDefinition<Input> = {
   }),
   async run(input, context) {
     const target = await resolveToolPath(context, input.path, 'write')
-    let content = await readFile(target, 'utf8')
-    const applied: string[] = []
+    const original = await readFile(target, 'utf8')
 
-    for (const [index, replacement] of input.replacements.entries()) {
-      if (!content.includes(replacement.search)) {
-        return {
-          ok: false,
-          output: `Replacement ${index + 1} not found in ${input.path}`,
-        }
-      }
-
-      content = replacement.replaceAll
-        ? content.split(replacement.search).join(replacement.replace)
-        : content.replace(replacement.search, replacement.replace)
-
-      applied.push(
-        replacement.replaceAll
-          ? `#${index + 1} replaceAll`
-          : `#${index + 1} replaceOnce`,
-      )
+    const result = applyReplacements(original, input.replacements, input.path)
+    if (!result.ok) {
+      return result.result
     }
 
-    const result = await applyReviewedFileChange(context, input.path, target, content)
-    if (!result.ok) {
-      return result
+    const writeResult = await applyReviewedFileChange(context, input.path, target, result.content)
+    if (!writeResult.ok) {
+      return writeResult
     }
 
     return {
       ok: true,
-      output: `Patched ${input.path} with ${applied.length} replacement(s): ${applied.join(', ')}`,
+      output: `Patched ${input.path} with ${result.applied.length} replacement(s): ${result.applied.join(', ')}`,
     }
   },
 }

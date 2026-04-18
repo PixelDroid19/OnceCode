@@ -12,6 +12,7 @@ import { summarizeMcpServers } from './mcp-status.js'
 import { MockModelAdapter } from './mock-model.js'
 import { PermissionManager } from './permissions.js'
 import { buildSystemPrompt } from './prompt.js'
+import { refreshSystemPrompt } from './session/system-prompt.js'
 import { createDefaultToolRegistry, hydrateMcpTools } from './tools/index.js'
 import type { ChatMessage } from './types.js'
 import { renderBanner } from './ui.js'
@@ -59,16 +60,6 @@ async function main(): Promise<void> {
       }),
     },
   ]
-
-  async function refreshSystemPrompt(): Promise<void> {
-    messages[0] = {
-      role: 'system',
-      content: await buildSystemPrompt(cwd, permissions.getSummary(), {
-        skills: tools.getSkills(),
-        mcpServers: tools.getMcpServers(),
-      }),
-    }
-  }
 
   try {
     if (isInteractiveTerminal) {
@@ -140,7 +131,7 @@ async function main(): Promise<void> {
         continue
       }
 
-      await refreshSystemPrompt()
+      await refreshSystemPrompt({ messages, cwd, permissions, tools })
       messages = [...messages, { role: 'user', content: input }]
       permissions.beginTurn()
       try {

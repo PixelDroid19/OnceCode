@@ -1,4 +1,13 @@
+import type { McpServerConfig } from './config.js'
 import type { ToolResult } from './tool.js'
+
+export function summarizeServerEndpoint(config: McpServerConfig): string {
+  const remoteUrl = config.url?.trim()
+  if (remoteUrl) return remoteUrl
+  const command = config.command?.trim() ?? ''
+  const args = config.args?.join(' ') ?? ''
+  return `${command} ${args}`.trim()
+}
 
 export function sanitizeToolSegment(value: string): string {
   return (
