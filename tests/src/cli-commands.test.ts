@@ -33,4 +33,12 @@ describe('cli-commands', () => {
     await expect(tryHandleLocalCommand('/model test-model')).resolves.toContain('saved model=test-model')
     expect(saveOnceCodeSettings).toHaveBeenCalledWith({ model: 'test-model' })
   })
+
+  it('supports viewing and changing the UI language', async () => {
+    const { tryHandleLocalCommand } = await import('../../src/cli-commands.js')
+
+    await expect(tryHandleLocalCommand('/language')).resolves.toContain('Current UI language:')
+    await expect(tryHandleLocalCommand('/language es')).resolves.toContain('Idioma de la interfaz cambiado')
+    expect(saveOnceCodeSettings).toHaveBeenCalledWith({ language: 'es' })
+  })
 })

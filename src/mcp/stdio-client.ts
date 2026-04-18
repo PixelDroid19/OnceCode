@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import path from 'node:path'
 import type { McpServerConfig } from '../config.js'
+import { t } from '../i18n/index.js'
 import {
   formatPromptResult,
   formatReadResourceResult,
@@ -88,7 +89,7 @@ export class StdioMcpClient {
       }
     }
 
-    throw lastError ?? new Error(`Failed to connect MCP server "${this.serverName}".`)
+    throw lastError ?? new Error(t('mcp_connect_failed', { name: this.serverName }))
   }
 
   getProtocol(): JsonRpcProtocol | null {
@@ -133,7 +134,7 @@ export class StdioMcpClient {
   private async spawnProcess(): Promise<void> {
     const command = (this.config.command ?? '').trim()
     if (!command) {
-      throw new Error(`MCP server "${this.serverName}" has no command configured.`)
+      throw new Error(t('mcp_no_command', { name: this.serverName }))
     }
 
     this.buffer = Buffer.alloc(0)
@@ -193,7 +194,7 @@ export class StdioMcpClient {
         return
       }
       const error = new Error(
-        `MCP server "${this.serverName}" exited with code ${code ?? 'unknown'}${
+        `${t('mcp_server_exited', { name: this.serverName, code: String(code ?? 'unknown') })}${
           this.stderrLines.length > 0
             ? `\n${this.stderrLines.join('\n')}`
             : ''
@@ -276,7 +277,7 @@ export class StdioMcpClient {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout)
       pending.reject(
-        new Error(`MCP server "${this.serverName}" closed before completing the request.`),
+        new Error(t('mcp_server_closed', { name: this.serverName })),
       )
     }
     this.pending.clear()
@@ -310,7 +311,7 @@ export class StdioMcpClient {
         this.pending.delete(id)
         reject(
           new Error(
-            `MCP ${this.serverName}: request timed out for ${method}${
+            `${t('mcp_request_timeout', { name: this.serverName, method })}${
               this.stderrLines.length > 0 ? `\n${this.stderrLines.join('\n')}` : ''
             }`,
           ),
@@ -328,7 +329,7 @@ export class StdioMcpClient {
 
   private send(message: JsonRpcMessage): void {
     if (!this.process) {
-      throw new Error(`MCP server "${this.serverName}" is not running.`)
+      throw new Error(t('mcp_server_not_running', { name: this.serverName }))
     }
 
     const body = Buffer.from(JSON.stringify(message), 'utf8')
@@ -417,7 +418,7 @@ export class StdioMcpClient {
     if (message.error) {
       pending.reject(
         new Error(
-          `MCP ${this.serverName}: ${message.error.message}${
+          `${t('mcp_server_error', { name: this.serverName, message: message.error.message })}${
             message.error.data ? `\n${JSON.stringify(message.error.data, null, 2)}` : ''
           }`,
         ),

@@ -48,6 +48,10 @@ src/
 │
 ├── config.ts                 Runtime and settings type definitions
 ├── config-store.ts           Persistence helpers for ~/.oncecode JSON files
+├── i18n/
+│   ├── index.ts              Translation lookup, interpolation, and locale loading
+│   ├── languages.ts          Supported UI languages and auto-detection
+│   └── locales/              Built-in locale dictionaries (en, es)
 │
 ├── tool.ts                   Tool contract, registration, validation
 ├── tools/
@@ -131,6 +135,7 @@ src/
 
 - **Barrel re-exports**: `mcp.ts` and `ui.ts` act as public API surfaces so internal module splits don't break consumers.
 - **Shared constants**: Magic numbers live in `constants.ts`, `mcp/constants.ts`, and `tui/constants.ts` instead of inline.
+- **Localized UI strings**: User-facing CLI/TUI text goes through `i18n/t()` so the interface can switch language without forking logic.
 - **Tool contract**: Every tool implements `ToolDefinition<T>` with a Zod schema and an `inputSchema` for the model.
 - **Permission flow**: Tools that modify the filesystem go through `applyReviewedFileChange` which shows a diff for user approval.
 - **MCP transport abstraction**: Both stdio and HTTP clients implement `McpClientLike` so the registry treats them uniformly.

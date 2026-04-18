@@ -89,6 +89,6 @@ describe('agent-loop', () => {
     })
 
     expect(messages.at(-1)?.role).toBe('assistant')
-    expect((messages.at(-1) as { content: string }).content).toContain('模型返回空响应')
+    expect((messages.at(-1) as { content: string }).content).toContain('The model returned an empty response')
   })
 })

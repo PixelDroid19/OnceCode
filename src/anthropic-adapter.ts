@@ -10,6 +10,7 @@ import {
   shouldRetryStatus,
   sleep,
 } from './utils/http.js'
+import { t } from './i18n/index.js'
 
 const DEFAULT_MAX_RETRIES = 4
 
@@ -218,7 +219,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
     }
 
     if (!response) {
-      throw new Error('Model request failed before receiving a response')
+      throw new Error(t('agent_request_failed_no_response'))
     }
 
     const data = (await readJsonBody(response)) as {

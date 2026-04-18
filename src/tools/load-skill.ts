@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { loadSkill } from '../skills.js'
 
@@ -26,7 +27,7 @@ export function createLoadSkillTool(cwd: string): ToolDefinition<Input> {
       if (!skill) {
         return {
           ok: false,
-          output: `Unknown skill: ${input.name}`,
+          output: t('tool_unknown_skill', { name: input.name }),
         }
       }
 

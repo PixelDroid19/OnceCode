@@ -1,6 +1,7 @@
 import { getErrorCode } from './errors.js'
 import { sleep, shouldRetryStatus } from './http.js'
 import { APP_USER_AGENT } from '../constants.js'
+import { t } from '../i18n/index.js'
 
 type SearchResult = {
   title: string
@@ -166,7 +167,9 @@ export async function searchDuckDuckGoLite(options: {
   }
 
   if (errors.length > 0) {
-    throw new Error(`all search providers failed (${errors.join('; ')})`)
+    throw new Error(t('search_all_failed', {
+      errors: errors.join('; '),
+    }))
   }
 
   return {
@@ -261,7 +264,7 @@ function fetchSearchPage(provider: SearchProvider, query: string): Promise<Respo
     return fetchWithRetry(url, { headers })
   }
 
-  throw new Error(`unsupported search provider: ${provider}`)
+  throw new Error(t('search_unsupported_provider', { provider }))
 }
 
 function parseSearchResults(provider: SearchProvider, html: string): SearchResult[] {

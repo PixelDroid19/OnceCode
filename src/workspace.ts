@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { t } from './i18n/index.js'
 import type { ToolContext } from './tool.js'
 
 /** Resolves a relative tool path to an absolute path after enforcing permission checks. */
@@ -18,7 +19,7 @@ export async function resolveToolPath(
       relative.startsWith(`..${path.sep}`) ||
       path.isAbsolute(relative)
     ) {
-      throw new Error(`Path escapes workspace: ${targetPath}`)
+      throw new Error(t('tool_path_escapes_workspace', { path: targetPath }))
     }
 
     return resolved

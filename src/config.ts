@@ -16,10 +16,13 @@ import {
   saveMcpTokensFile,
   saveScopedMcpServers,
 } from './config-store.js'
+import { t } from './i18n/index.js'
+import type { LanguageSetting } from './i18n/languages.js'
 
 /** User-facing settings stored in ~/.oncecode/settings.json. */
 export type OnceCodeSettings = {
   env?: Record<string, string | number>
+  language?: LanguageSetting
   model?: string
   maxOutputTokens?: number
   mcpServers?: Record<string, McpServerConfig>
@@ -64,6 +67,7 @@ export {
   loadScopedMcpServers,
   readMcpConfigFile,
   readMcpTokensFile,
+  readSettingsFile,
   saveMcpTokensFile,
   saveScopedMcpServers,
 }
@@ -162,13 +166,17 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
 
   if (!model) {
     throw new Error(
-      `No model configured. Set ~/.oncecode/settings.json or env.ANTHROPIC_MODEL.`,
+      t('config_no_model', {
+        settingsPath: ONCECODE_SETTINGS_PATH,
+      }),
     )
   }
 
   if (!authToken && !apiKey) {
     throw new Error(
-      `No auth configured. Set ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY in ~/.oncecode/settings.json or process env.`,
+      t('config_no_auth', {
+        settingsPath: ONCECODE_SETTINGS_PATH,
+      }),
     )
   }
 

@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import { registerBackgroundShellTask } from '../background-tasks.js'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { splitCommandLine } from '../utils/command-line.js'
 import { resolveToolPath } from '../workspace.js'
@@ -129,7 +130,7 @@ export const runCommandTool: ToolDefinition<Input> = {
     if (!normalized.command) {
       return {
         ok: false,
-        output: 'Command not allowed: empty command',
+        output: t('tool_empty_command'),
       }
     }
 
@@ -173,7 +174,10 @@ export const runCommandTool: ToolDefinition<Input> = {
 
       return {
         ok: true,
-        output: `Background command started.\nTASK: ${backgroundTask.taskId}\nPID: ${backgroundTask.pid}`,
+        output: t('tool_bg_command_started', {
+          taskId: backgroundTask.taskId,
+          pid: backgroundTask.pid,
+        }),
         backgroundTask,
       }
     }

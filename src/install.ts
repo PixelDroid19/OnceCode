@@ -9,6 +9,7 @@ import {
   loadEffectiveSettings,
   saveOnceCodeSettings,
 } from './config.js'
+import { initializeI18n, t } from './i18n/index.js'
 
 function hasPathEntry(target: string): boolean {
   const pathEntries = (process.env.PATH ?? '').split(':')
@@ -27,7 +28,7 @@ async function askRequired(
     const answer = (incoming ?? '').trim()
     const value = answer || defaultValue || ''
     if (value) return value
-    console.log('该项不能为空，请重新输入。')
+    console.log(t('install_field_required'))
   }
 }
 
@@ -37,6 +38,7 @@ function secretPromptSuffix(secret?: string): string {
 }
 
 async function main(): Promise<void> {
+  await initializeI18n('en')
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -52,9 +54,9 @@ async function main(): Promise<void> {
     const settings = await loadEffectiveSettings()
     const currentEnv = settings.env ?? {}
 
-    console.log('oncecode installer')
-    console.log(`配置会写入 ${ONCECODE_SETTINGS_PATH}`)
-    console.log('配置保存在独立目录中，不会影响其它本地工具配置。')
+    console.log(t('install_title'))
+    console.log(t('install_config_path', { path: ONCECODE_SETTINGS_PATH }))
+    console.log(t('install_settings_note'))
     console.log('')
 
     const model = await askRequired(
@@ -73,7 +75,7 @@ async function main(): Promise<void> {
     const authToken = tokenInput || savedAuthToken
 
     if (!authToken) {
-      throw new Error('ANTHROPIC_AUTH_TOKEN 不能为空。')
+      throw new Error(t('install_token_empty'))
     }
 
     await saveOnceCodeSettings({
@@ -100,18 +102,18 @@ async function main(): Promise<void> {
     await writeFile(launcherPath, launcherScript, { mode: 0o755 })
 
     console.log('')
-    console.log('安装完成。')
-    console.log(`配置文件: ${ONCECODE_SETTINGS_PATH}`)
-    console.log(`启动命令: ${launcherPath}`)
+    console.log(t('install_complete'))
+    console.log(t('install_config_file', { path: ONCECODE_SETTINGS_PATH }))
+    console.log(t('install_launch_command', { path: launcherPath }))
 
     if (!hasPathEntry(targetBinDir)) {
       console.log('')
-      console.log(`你的 PATH 里还没有 ${targetBinDir}`)
-      console.log(`可以把下面这行加入 ~/.bashrc 或 ~/.zshrc:`)
+      console.log(t('install_path_missing', { path: targetBinDir }))
+      console.log(t('install_path_hint'))
       console.log(`export PATH="${targetBinDir}:$PATH"`)
     } else {
       console.log('')
-      console.log('现在你可以在任意终端输入 `oncecode` 启动。')
+      console.log(t('install_success'))
     }
   } finally {
     rl.close()

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { applyReviewedFileChange } from '../file-review.js'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { resolveToolPath } from '../workspace.js'
 import { applyReplacements } from './search-replace.js'
@@ -42,7 +43,10 @@ export const editFileTool: ToolDefinition<Input> = {
       input.path,
     )
     if (!result.ok) {
-      return { ok: false, output: `Text not found in ${input.path}` }
+      return {
+        ok: false,
+        output: t('tool_text_not_found', { path: input.path }),
+      }
     }
 
     return applyReviewedFileChange(context, input.path, target, result.content)

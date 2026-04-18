@@ -3,6 +3,8 @@ import path from 'node:path'
 import process from 'node:process'
 import type { RuntimeConfig } from '../config.js'
 import type { SlashCommand } from '../cli-commands.js'
+import { APP_NAME } from '../constants.js'
+import { t } from '../i18n/index.js'
 import type { PermissionRequest } from '../permissions.js'
 import {
   COLLAPSED_DETAIL_LIMIT,
@@ -256,16 +258,16 @@ export function renderBanner(
   const panelWidth = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
   const panelInner = Math.max(0, panelWidth - 4)
   const cwdName = path.basename(cwd) || cwd
-  const model = runtime?.model ?? 'not-configured'
+  const model = runtime?.model ?? t('ui_status_not_configured')
   const provider = runtime?.baseUrl
     ? runtime.baseUrl.replace(/^https?:\/\//, '').split('/')[0] || 'custom'
-    : 'offline'
+    : t('ui_status_offline')
   const pathBudget = Math.max(20, panelInner - 28)
   const projectLine = `${BLUE}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
   const permissionLine =
     permissionSummary.length > 0
       ? `${DIM}${truncatePlain(permissionSummary.join(' | '), Math.max(24, panelInner))}${RESET}`
-      : `${DIM}permissions: ask on sensitive actions${RESET}`
+      : `${DIM}${t('ui_permissions_info')}${RESET}`
   const metaBadges = [
     colorBadge('session', 'local', BRIGHT_YELLOW),
     colorBadge('provider', provider, CYAN),
@@ -288,9 +290,9 @@ export function renderBanner(
   const metaLine = joinSegmentsWithinWidth(metaBadges, '  ', panelInner)
 
   return renderPanel(
-    'OnceCode',
+    APP_NAME,
     [
-      `${DIM}Terminal coding assistant with a card-style session layout.${RESET}`,
+      `${DIM}${t('ui_app_description')}${RESET}`,
       '',
       projectLine,
       metaLine,
@@ -304,7 +306,7 @@ export function renderBanner(
 
 /** Formats the current status as a colorized inline label. */
 export function renderStatusLine(status: string | null): string {
-  if (!status) return `${DIM}Ready${RESET}`
+  if (!status) return `${DIM}${t('ui_status_ready')}${RESET}`
   return `${YELLOW}${BOLD}${status}${RESET}`
 }
 
@@ -382,11 +384,11 @@ export function renderSlashMenu(
   selectedIndex: number,
 ): string {
   if (commands.length === 0) {
-    return `${DIM}no matching slash commands${RESET}`
+    return `${DIM}${t('ui_no_matching_commands')}${RESET}`
   }
 
   return [
-    `${DIM}commands${RESET}`,
+    `${DIM}${t('ui_commands_label')}${RESET}`,
     ...commands.map((command, index) => {
       const usage = padPlain(command.usage, 24)
       const prefix =
@@ -487,7 +489,7 @@ export function renderPermissionPrompt(
   } = sliceVisibleDetails(detailLines, expanded, scrollOffset)
 
   const promptLines = [
-    `${YELLOW}${BOLD}Approval Required${RESET}`,
+    `${YELLOW}${BOLD}${t('ui_approval_required')}${RESET}`,
     `${BOLD}${request.summary}${RESET}`,
     ...visibleDetailLines,
   ]
@@ -495,15 +497,15 @@ export function renderPermissionPrompt(
   if (request.kind === 'edit') {
     if (!expanded && hiddenCount > 0) {
       promptLines.push(
-        `${DIM}... ${hiddenCount} more line(s) hidden${RESET}`,
-        `${DIM}Ctrl+O expand full diff${RESET}`,
+        `${DIM}${t('ui_lines_hidden', { count: hiddenCount })}${RESET}`,
+        `${DIM}${t('ui_diff_expand')}${RESET}`,
       )
     } else if (expanded) {
       promptLines.push(
-        `${DIM}Ctrl+O collapse | Wheel/PgUp/PgDn/Alt+Up/Alt+Down scroll (${Math.max(
-          0,
-          Math.min(scrollOffset, maxScroll),
-        )}/${maxScroll})${RESET}`,
+        `${DIM}${t('ui_diff_collapse', {
+          offset: Math.max(0, Math.min(scrollOffset, maxScroll)),
+          maxScroll,
+        })}${RESET}`,
       )
     }
   }
@@ -513,8 +515,8 @@ export function renderPermissionPrompt(
     '',
     ...(feedbackMode
       ? [
-          `${YELLOW}${BOLD}Reject With Guidance${RESET}`,
-          `${DIM}Type feedback for model, Enter submit, Esc back${RESET}`,
+          `${YELLOW}${BOLD}${t('ui_reject_with_guidance')}${RESET}`,
+          `${DIM}${t('ui_feedback_hint')}${RESET}`,
           `> ${feedbackInput}`,
         ]
       : request.choices.map((choice, index) => {
@@ -523,7 +525,7 @@ export function renderPermissionPrompt(
           return `${prefix} ${choice.label}`
         })),
     '',
-    `${DIM}Use Up/Down to select, Enter confirm, Esc deny once${RESET}`,
+    `${DIM}${t('ui_approval_hint')}${RESET}`,
   ].join('\n')
 }
 

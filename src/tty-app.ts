@@ -13,6 +13,7 @@ import {
 } from './permissions.js'
 import { refreshSystemPrompt } from './session/system-prompt.js'
 import { parseInputChunk, type ParsedInputEvent } from './tui/input-parser.js'
+import { t } from './i18n/index.js'
 import {
   clearScreen,
   enterAlternateScreen,
@@ -66,7 +67,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
   if (state.pendingApproval) {
     console.log(
-      renderPanel('approval', renderPermissionPrompt(state.pendingApproval.request, {
+      renderPanel(t('ui_panel_approval'), renderPermissionPrompt(state.pendingApproval.request, {
         expanded: state.pendingApproval.detailsExpanded,
         scrollOffset: state.pendingApproval.detailsScrollOffset,
         selectedChoiceIndex: state.pendingApproval.selectedChoiceIndex,
@@ -75,7 +76,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       })),
     )
     console.log('')
-    console.log(renderPanel('activity', renderToolPanel(state.activeTool, state.recentTools, backgroundTasks)))
+    console.log(renderPanel(t('ui_panel_activity'), renderToolPanel(state.activeTool, state.recentTools, backgroundTasks)))
     console.log('')
     console.log(
       renderFooterBar(
@@ -91,14 +92,14 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
   console.log(
     renderPanel(
-      'session feed',
+      t('ui_panel_session'),
       state.transcript.length > 0
         ? renderTranscript(
             state.transcript,
             state.transcriptScrollOffset,
             getTranscriptBodyLines(args, state),
           )
-        : `${renderStatusLine(null)}\n\nType /help for commands.`,
+        : `${renderStatusLine(null)}\n\n${t('ui_hint_help')}`,
       {
         rightTitle: `${state.transcript.length} events`,
         minBodyLines: getTranscriptBodyLines(args, state),
@@ -128,7 +129,7 @@ async function executeToolShortcut(
   rerender: () => void,
 ): Promise<void> {
   state.isBusy = true
-  state.status = `Running ${toolName}...`
+  state.status = t('ui_running_tool', { toolName })
   state.activeTool = toolName
   const entryId = pushTranscriptEntry(state, {
     kind: 'tool',
@@ -180,8 +181,8 @@ async function handleInput(
 ): Promise<boolean> {
   if (state.isBusy) {
     state.status = state.activeTool
-      ? `Running ${state.activeTool}...`
-      : 'Current turn is still running...'
+      ? t('ui_running_tool', { toolName: state.activeTool })
+      : t('ui_turn_running')
     return false
   }
 
@@ -234,10 +235,12 @@ async function handleInput(
     const matches = findMatchingSlashCommands(input)
     pushTranscriptEntry(state, {
       kind: 'assistant',
-      body:
-        matches.length > 0
-          ? `未识别命令。你是不是想输入：\n${matches.join('\n')}`
-          : '未识别命令。输入 /help 查看可用命令。',
+        body:
+          matches.length > 0
+            ? t('cmd_unknown_suggest', {
+                matches: matches.join('\n'),
+              })
+            : t('cmd_unknown'),
     })
     return false
   }
@@ -249,7 +252,7 @@ async function handleInput(
     body: input,
   })
   state.transcriptScrollOffset = 0
-  state.status = 'Thinking...'
+  state.status = t('ui_thinking')
   state.isBusy = true
   rerender()
 
@@ -282,7 +285,7 @@ async function handleInput(
         rerender()
       },
       onToolStart(toolName, toolInput) {
-        state.status = `Running ${toolName}...`
+        state.status = t('ui_running_tool', { toolName })
         state.activeTool = toolName
         let entryId: number
         const targetPath = extractPathFromToolInput(toolInput)
@@ -401,7 +404,7 @@ async function handleInput(
           })
         }
         state.activeTool = null
-        state.status = 'Thinking...'
+        state.status = t('ui_thinking')
         rerender()
       },
     })
@@ -411,11 +414,11 @@ async function handleInput(
     const message = error instanceof Error ? error.message : String(error)
     args.messages.push({
       role: 'assistant',
-      content: `请求失败: ${message}`,
+        content: t('agent_request_failed', { message }),
     })
     pushTranscriptEntry(state, {
       kind: 'assistant',
-      body: `请求失败: ${message}`,
+        body: t('agent_request_failed', { message }),
     })
     state.transcriptScrollOffset = 0
   } finally {
@@ -628,8 +631,8 @@ function handleNormalEvent(
   if (event.kind === 'key' && event.name === 'return') {
     if (state.isBusy) {
       state.status = state.activeTool
-        ? `Running ${state.activeTool}...`
-        : 'Current turn is still running...'
+        ? t('ui_running_tool', { toolName: state.activeTool })
+        : t('ui_turn_running')
       rerender()
       return
     }
@@ -877,7 +880,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
       showCursor()
       exitAlternateScreen()
       process.stdin.pause()
-      process.stdout.write('oncecode exited.\n')
+      process.stdout.write(`${t('ui_exited')}\n`)
     }
 
     const finish = () => {

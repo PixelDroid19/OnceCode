@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { applyReviewedFileChange } from '../file-review.js'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { resolveToolPath } from '../workspace.js'
 import { applyReplacements, type Replacement } from './search-replace.js'
@@ -59,7 +60,11 @@ export const patchFileTool: ToolDefinition<Input> = {
 
     return {
       ok: true,
-      output: `Patched ${input.path} with ${result.applied.length} replacement(s): ${result.applied.join(', ')}`,
+      output: t('tool_patch_applied', {
+        path: input.path,
+        count: result.applied.length,
+        applied: result.applied.join(', '),
+      }),
     }
   },
 }

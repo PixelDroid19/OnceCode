@@ -1,4 +1,5 @@
 import type { McpServerConfig } from '../config.js'
+import { t } from '../i18n/index.js'
 import {
   formatPromptResult,
   formatReadResourceResult,
@@ -38,7 +39,7 @@ export class StreamableHttpMcpClient {
 
   async start(): Promise<void> {
     if (!this.config.url?.trim()) {
-      throw new Error(`MCP server "${this.serverName}" has no URL configured.`)
+      throw new Error(t('mcp_no_url', { name: this.serverName }))
     }
 
     this.bearerToken = (await loadMcpToken(this.serverName)) ?? null
@@ -134,13 +135,13 @@ export class StreamableHttpMcpClient {
     )
 
     if (!payload || typeof payload !== 'object') {
-      throw new Error(`MCP ${this.serverName}: invalid response payload.`)
+      throw new Error(t('mcp_invalid_response', { name: this.serverName }))
     }
 
     const message = payload as JsonRpcMessage
     if (message.error) {
       throw new Error(
-        `MCP ${this.serverName}: ${message.error.message}${
+        `${t('mcp_server_error', { name: this.serverName, message: message.error.message })}${
           message.error.data ? `\n${JSON.stringify(message.error.data, null, 2)}` : ''
         }`,
       )
@@ -151,7 +152,7 @@ export class StreamableHttpMcpClient {
   private async postJsonRpc(message: JsonRpcMessage, timeoutMs: number): Promise<unknown> {
     const endpoint = this.config.url?.trim()
     if (!endpoint) {
-      throw new Error(`MCP server "${this.serverName}" has no URL configured.`)
+      throw new Error(t('mcp_no_url', { name: this.serverName }))
     }
 
     const controller = new AbortController()
@@ -176,7 +177,7 @@ export class StreamableHttpMcpClient {
         const authHint = extractAuthHint(response.headers)
         const bodyText = await response.text().catch(() => '')
         const detail = bodyText.trim().slice(0, 600)
-        const lines = [`HTTP ${response.status} ${response.statusText}`]
+        const lines = [t('mcp_http_error', { status: response.status, statusText: response.statusText })]
         if (authHint) {
           lines.push(`AUTH:\n${authHint}`)
         }
@@ -194,18 +195,18 @@ export class StreamableHttpMcpClient {
         return JSON.parse(responseText) as unknown
       } catch {
         throw new Error(
-          `MCP ${this.serverName}: expected JSON response but received non-JSON payload.`,
+          t('mcp_non_json_response', { name: this.serverName }),
         )
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(
-          `MCP ${this.serverName}: request timed out for ${message.method ?? 'notification'}.`,
+          t('mcp_request_timeout', { name: this.serverName, method: message.method ?? 'notification' }),
         )
       }
       throw error instanceof Error
         ? error
-        : new Error(`MCP ${this.serverName}: ${String(error)}`)
+        : new Error(`${t('mcp_server_error', { name: this.serverName, message: String(error) })}`)
     } finally {
       clearTimeout(timeout)
     }

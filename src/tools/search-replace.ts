@@ -1,4 +1,5 @@
 import type { ToolResult } from '../tool.js'
+import { t } from '../i18n/index.js'
 
 /** A single search string and its replacement, with optional global replace. */
 export type Replacement = {
@@ -24,7 +25,13 @@ export function applyReplacements(
     if (!text.includes(replacement.search)) {
       return {
         ok: false,
-        result: { ok: false, output: `Replacement ${index + 1} not found in ${filePath}` },
+        result: {
+          ok: false,
+          output: t('tool_replacement_not_found', {
+            index: index + 1,
+            path: filePath,
+          }),
+        },
       }
     }
 

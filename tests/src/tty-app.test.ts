@@ -68,6 +68,6 @@ describe('tty-app', () => {
     expect(stdoutWrite).toHaveBeenCalled()
     expect(setRawMode).toHaveBeenCalledWith(true)
     expect(setRawMode).toHaveBeenCalledWith(false)
-    expect(writes.join('')).toContain('oncecode exited.')
+    expect(writes.join('')).toContain('OnceCode exited.')
   })
 })

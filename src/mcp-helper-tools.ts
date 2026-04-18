@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { McpClientLike } from './mcp.js'
+import { t } from './i18n/index.js'
 import type { ToolDefinition } from './tool.js'
 
 function getTargetClients(
@@ -54,7 +55,7 @@ export function createMcpResourceTools(
         output:
           lines.length > 0
             ? lines.join('\n')
-            : 'Connected MCP servers did not publish any MCP resources. This does not mean MCP tools are unavailable.',
+            : t('mcp_no_resources'),
       }
     },
   } satisfies ToolDefinition<{ server?: string }>
@@ -79,7 +80,7 @@ export function createMcpResourceTools(
       if (!client) {
         return {
           ok: false,
-          output: `Unknown MCP server: ${input.server}`,
+          output: t('mcp_unknown_server', { server: input.server }),
         }
       }
       return client.readResource(input.uri)
@@ -134,7 +135,7 @@ export function createMcpPromptTools(
         output:
           lines.length > 0
             ? lines.join('\n')
-            : 'Connected MCP servers did not publish any MCP prompts. This does not mean MCP tools are unavailable.',
+            : t('mcp_no_prompts'),
       }
     },
   } satisfies ToolDefinition<{ server?: string }>
@@ -169,7 +170,7 @@ export function createMcpPromptTools(
       if (!client) {
         return {
           ok: false,
-          output: `Unknown MCP server: ${input.server}`,
+          output: t('mcp_unknown_server', { server: input.server }),
         }
       }
       return client.getPrompt(input.name, input.arguments)

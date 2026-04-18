@@ -31,7 +31,7 @@ describe('install entrypoint', () => {
 
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('oncecode installer')
-    expect(result.stdout).toContain('安装完成。')
+    expect(result.stdout).toContain('Installation complete.')
 
     const settingsPath = path.join(homeDir, '.oncecode', 'settings.json')
     const launcherPath = path.join(homeDir, '.local', 'bin', 'oncecode')

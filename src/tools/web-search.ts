@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { searchDuckDuckGoLite } from '../utils/web.js'
 
@@ -63,7 +64,7 @@ export const webSearchTool: ToolDefinition<Input> = {
       if (result.organic.length === 0) {
         return {
           ok: true,
-          output: 'No results found.',
+          output: t('tool_no_results'),
         }
       }
 
@@ -85,7 +86,7 @@ export const webSearchTool: ToolDefinition<Input> = {
       const message = error instanceof Error ? error.message : String(error)
       return {
         ok: false,
-        output: `Web search failed: ${message}`,
+        output: t('tool_web_search_failed', { message }),
       }
     }
   },

@@ -1,6 +1,7 @@
 import type { ToolRegistry } from './tool.js'
 import type { ChatMessage, ModelAdapter } from './types.js'
 import type { PermissionManager } from './permissions.js'
+import { t } from './i18n/index.js'
 
 function isEmptyAssistantResponse(content: string): boolean {
   return content.trim().length === 0
@@ -45,7 +46,9 @@ function formatDiagnostics(args: {
     parts.push(`ignored=${args.ignoredBlockTypes!.join(',')}`)
   }
 
-  return parts.length > 0 ? ` 诊断信息: ${parts.join('; ')}。` : ''
+  return parts.length > 0
+    ? ` ${t('agent_diagnostics', { details: parts.join('; ') })}`
+    : ''
 }
 
 function isRecoverableThinkingStop(args: {
@@ -132,8 +135,8 @@ export async function runAgentTurn(args: {
         const stopReason = next.diagnostics?.stopReason
         const progressContent =
           stopReason === 'max_tokens'
-            ? '模型在 thinking 阶段触发 max_tokens，正在继续请求后续步骤...'
-            : '模型返回 pause_turn，正在继续请求后续步骤...'
+            ? t('agent_max_tokens_thinking')
+            : t('agent_pause_turn')
         args.onProgressMessage?.(progressContent)
         messages = [
           ...messages,
@@ -166,9 +169,16 @@ export async function runAgentTurn(args: {
         const fallbackContent =
           sawToolResultThisTurn
             ? toolErrorCount > 0
-              ? `工具执行后模型返回空响应，已停止当前回合。最近有 ${toolErrorCount} 个工具报错；请重试、调整命令，或让模型改用其他方案。${diagnosticsSuffix}`
-              : `工具执行后模型返回空响应，已停止当前回合。请重试，或要求模型继续完成剩余步骤。${diagnosticsSuffix}`
-            : `模型返回空响应，已停止当前回合。请重试，或要求模型继续。${diagnosticsSuffix}`
+              ? t('agent_empty_response_with_errors', {
+                  count: toolErrorCount,
+                  diagnostics: diagnosticsSuffix,
+                })
+              : t('agent_empty_response_after_tools', {
+                  diagnostics: diagnosticsSuffix,
+                })
+            : t('agent_empty_response', {
+                diagnostics: diagnosticsSuffix,
+              })
 
         args.onAssistantMessage?.(fallbackContent)
         return [
@@ -266,7 +276,7 @@ export async function runAgentTurn(args: {
     }
   }
 
-  const maxStepContent = `达到最大工具步数限制，已停止当前回合。`
+  const maxStepContent = t('agent_max_steps')
   args.onAssistantMessage?.(maxStepContent)
   return [
     ...messages,

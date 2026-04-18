@@ -7,6 +7,8 @@ import {
   tryHandleLocalCommand,
 } from './cli-commands.js'
 import { loadRuntimeConfig } from './config.js'
+import { readSettingsFile, ONCECODE_SETTINGS_PATH } from './config.js'
+import { initializeI18n, t } from './i18n/index.js'
 import { maybeHandleManagementCommand } from './manage-cli.js'
 import { summarizeMcpServers } from './mcp-status.js'
 import { MockModelAdapter } from './mock-model.js'
@@ -18,10 +20,17 @@ import type { ChatMessage } from './types.js'
 import { renderBanner } from './ui.js'
 import { runTtyApp } from './tty-app.js'
 import { runAgentTurn } from './agent-loop.js'
+import type { OnceCodeSettings } from './config.js'
 
 async function main(): Promise<void> {
   const cwd = process.cwd()
   const argv = process.argv.slice(2)
+
+  const persistedSettings = await readSettingsFile(ONCECODE_SETTINGS_PATH).catch(
+    (): Promise<OnceCodeSettings> => Promise.resolve({}),
+  )
+  await initializeI18n(persistedSettings.language ?? 'en')
+
   if (await maybeHandleManagementCommand(cwd, argv)) {
     return
   }
@@ -118,9 +127,13 @@ async function main(): Promise<void> {
         if (input.startsWith('/')) {
           const matches = findMatchingSlashCommands(input)
           if (matches.length > 0) {
-            console.log(`\n未识别命令。你是不是想输入：\n${matches.join('\n')}\n`)
+            console.log(
+              `\n${t('cmd_unknown_suggest', {
+                matches: matches.join('\n'),
+              })}\n`,
+            )
           } else {
-            console.log(`\n未识别命令。输入 /help 查看可用命令。\n`)
+            console.log(`\n${t('cmd_unknown')}\n`)
           }
           continue
         }
@@ -149,7 +162,7 @@ async function main(): Promise<void> {
           ...messages,
           {
             role: 'assistant',
-            content: `请求失败: ${message}`,
+            content: t('agent_request_failed', { message }),
           },
         ]
       } finally {

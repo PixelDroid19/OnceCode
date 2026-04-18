@@ -12,6 +12,7 @@ import {
   normalizePath,
 } from './permission-rules.js'
 import type { PathIntent } from './permission-rules.js'
+import { t } from './i18n/index.js'
 
 /** The user's response to a permission prompt (allow/deny, scope, persistence). */
 export type PermissionDecision =
@@ -172,7 +173,11 @@ export class PermissionManager {
       this.sessionDeniedPaths.has(normalizedTarget) ||
       matchesDirectoryPrefix(normalizedTarget, this.deniedDirectoryPrefixes)
     ) {
-      throw new Error(`Access denied for path outside cwd: ${normalizedTarget}`)
+      throw new Error(
+        t('perm_path_denied', {
+          path: normalizedTarget,
+        }),
+      )
     }
 
     if (
@@ -184,7 +189,10 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Path ${normalizedTarget} is outside cwd ${this.workspaceRoot}. Start oncecode in TTY mode to approve it.`,
+        t('perm_path_outside_cwd', {
+          target: normalizedTarget,
+          cwd: this.workspaceRoot,
+        }),
       )
     }
 
@@ -195,7 +203,9 @@ export class PermissionManager {
 
     const promptResult = await this.prompt({
       kind: 'path',
-      summary: `oncecode wants ${intent.replace('_', ' ')} access outside the current cwd`,
+      summary: t('perm_path_access_request', {
+        intent: intent.replace('_', ' '),
+      }),
       details: [
         `cwd: ${this.workspaceRoot}`,
         `target: ${normalizedTarget}`,
@@ -203,10 +213,10 @@ export class PermissionManager {
       ],
       scope: scopeDirectory,
       choices: [
-        { key: 'y', label: 'allow once', decision: 'allow_once' },
-        { key: 'a', label: 'allow this directory', decision: 'allow_always' },
-        { key: 'n', label: 'deny once', decision: 'deny_once' },
-        { key: 'd', label: 'deny this directory', decision: 'deny_always' },
+        { key: 'y', label: t('perm_allow_once'), decision: 'allow_once' },
+        { key: 'a', label: t('perm_allow_directory'), decision: 'allow_always' },
+        { key: 'n', label: t('perm_deny_once'), decision: 'deny_once' },
+        { key: 'd', label: t('perm_deny_directory'), decision: 'deny_always' },
       ],
     })
 
@@ -228,7 +238,11 @@ export class PermissionManager {
       this.sessionDeniedPaths.add(normalizedTarget)
     }
 
-    throw new Error(`Access denied for path outside cwd: ${normalizedTarget}`)
+    throw new Error(
+      t('perm_path_denied', {
+        path: normalizedTarget,
+      }),
+    )
   }
 
   async ensureCommand(
@@ -252,7 +266,7 @@ export class PermissionManager {
       this.sessionDeniedCommands.has(signature) ||
       this.deniedCommandPatterns.has(signature)
     ) {
-      throw new Error(`Command denied: ${signature}`)
+      throw new Error(t('perm_command_denied', { signature }))
     }
 
     if (
@@ -264,15 +278,17 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Command requires approval: ${signature}. Start oncecode in TTY mode to approve it.`,
+        t('perm_command_requires_approval', {
+          signature,
+        }),
       )
     }
 
     const promptResult = await this.prompt({
       kind: 'command',
       summary: options?.forcePromptReason
-        ? 'oncecode wants approval for this command'
-        : 'oncecode wants to run a dangerous command',
+        ? t('perm_command_approval_request')
+        : t('perm_dangerous_command'),
       details: [
         `cwd: ${commandCwd}`,
         `command: ${signature}`,
@@ -280,10 +296,10 @@ export class PermissionManager {
       ],
       scope: signature,
       choices: [
-        { key: 'y', label: 'allow once', decision: 'allow_once' },
-        { key: 'a', label: 'always allow this command', decision: 'allow_always' },
-        { key: 'n', label: 'deny once', decision: 'deny_once' },
-        { key: 'd', label: 'always deny this command', decision: 'deny_always' },
+        { key: 'y', label: t('perm_allow_once'), decision: 'allow_once' },
+        { key: 'a', label: t('perm_always_allow_command'), decision: 'allow_always' },
+        { key: 'n', label: t('perm_deny_once'), decision: 'deny_once' },
+        { key: 'd', label: t('perm_always_deny_command'), decision: 'deny_always' },
       ],
     })
 
@@ -305,7 +321,7 @@ export class PermissionManager {
       this.sessionDeniedCommands.add(signature)
     }
 
-    throw new Error(`Command denied: ${signature}`)
+    throw new Error(t('perm_command_denied', { signature }))
   }
 
   async ensureEdit(targetPath: string, diffPreview: string): Promise<void> {
@@ -317,7 +333,7 @@ export class PermissionManager {
       this.sessionDeniedEdits.has(normalizedTarget) ||
       this.deniedEditPatterns.has(normalizedTarget)
     ) {
-      throw new Error(`Edit denied: ${normalizedTarget}`)
+      throw new Error(t('perm_edit_denied', { path: normalizedTarget }))
     }
 
     if (
@@ -331,13 +347,15 @@ export class PermissionManager {
 
     if (!this.prompt) {
       throw new Error(
-        `Edit requires approval: ${normalizedTarget}. Start oncecode in TTY mode to review it.`,
+        t('perm_edit_requires_approval', {
+          path: normalizedTarget,
+        }),
       )
     }
 
     const promptResult = await this.prompt({
       kind: 'edit',
-      summary: 'oncecode wants to apply a file modification',
+      summary: t('perm_edit_request'),
       details: [
         `target: ${normalizedTarget}`,
         '',
@@ -345,13 +363,13 @@ export class PermissionManager {
       ],
       scope: normalizedTarget,
       choices: [
-        { key: '1', label: 'apply once', decision: 'allow_once' },
-        { key: '2', label: 'allow this file in this turn', decision: 'allow_turn' },
-        { key: '3', label: 'allow all edits in this turn', decision: 'allow_all_turn' },
-        { key: '4', label: 'always allow this file', decision: 'allow_always' },
-        { key: '5', label: 'reject once', decision: 'deny_once' },
-        { key: '6', label: 'reject and send guidance to model', decision: 'deny_with_feedback' },
-        { key: '7', label: 'always reject this file', decision: 'deny_always' },
+        { key: '1', label: t('perm_apply_once'), decision: 'allow_once' },
+        { key: '2', label: t('perm_allow_file_turn'), decision: 'allow_turn' },
+        { key: '3', label: t('perm_allow_all_edits_turn'), decision: 'allow_all_turn' },
+        { key: '4', label: t('perm_always_allow_file'), decision: 'allow_always' },
+        { key: '5', label: t('perm_reject_once'), decision: 'deny_once' },
+        { key: '6', label: t('perm_reject_with_guidance'), decision: 'deny_with_feedback' },
+        { key: '7', label: t('perm_always_reject_file'), decision: 'deny_always' },
       ],
     })
 
@@ -380,11 +398,14 @@ export class PermissionManager {
       const guidance = promptResult.feedback?.trim()
       if (guidance) {
         throw new Error(
-          `Edit denied: ${normalizedTarget}\nUser guidance: ${guidance}`,
+          t('perm_edit_denied_with_guidance', {
+            path: normalizedTarget,
+            guidance,
+          }),
         )
       }
       this.sessionDeniedEdits.add(normalizedTarget)
-      throw new Error(`Edit denied: ${normalizedTarget}`)
+      throw new Error(t('perm_edit_denied', { path: normalizedTarget }))
     }
 
     if (promptResult.decision === 'deny_always') {
@@ -394,7 +415,7 @@ export class PermissionManager {
       this.sessionDeniedEdits.add(normalizedTarget)
     }
 
-    throw new Error(`Edit denied: ${normalizedTarget}`)
+    throw new Error(t('perm_edit_denied', { path: normalizedTarget }))
   }
 }
 

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createTwoFilesPatch } from 'diff'
+import { t } from './i18n/index.js'
 import type { ToolContext, ToolResult } from './tool.js'
 import { isEnoentError } from './utils/errors.js'
 
@@ -56,7 +57,7 @@ export async function applyReviewedFileChange(
   if (previousContent === nextContent) {
     return {
       ok: true,
-      output: `No changes needed for ${filePath}`,
+      output: t('tool_no_changes', { path: filePath }),
     }
   }
 
@@ -68,6 +69,6 @@ export async function applyReviewedFileChange(
 
   return {
     ok: true,
-    output: `Applied reviewed changes to ${filePath}`,
+    output: t('tool_changes_applied', { path: filePath }),
   }
 }

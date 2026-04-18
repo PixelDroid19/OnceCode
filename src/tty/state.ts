@@ -9,16 +9,20 @@ import {
   renderSlashMenu,
 } from '../tui/chrome.js'
 import { renderInputPrompt } from '../tui/input.js'
-import { SLASH_COMMANDS, findMatchingSlashCommands } from '../cli-commands.js'
+import {
+  findMatchingSlashCommands,
+  getSlashCommands,
+} from '../cli-commands.js'
 import type { SlashCommand } from '../cli-commands.js'
 import { summarizeMcpServers } from '../mcp-status.js'
 
 /** Filters slash commands matching the current input prefix for autocomplete display. */
 export function getVisibleCommands(input: string): SlashCommand[] {
+  const commands = getSlashCommands()
   if (!input.startsWith('/')) return []
-  if (input === '/') return SLASH_COMMANDS
+  if (input === '/') return commands
   const matches = findMatchingSlashCommands(input)
-  return SLASH_COMMANDS.filter(command => matches.includes(command.usage))
+  return commands.filter(command => matches.includes(command.usage))
 }
 
 /** Scrolls the transcript view by a delta, clamping to valid bounds. */

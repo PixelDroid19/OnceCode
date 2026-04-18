@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { PermissionManager } from './permissions.js'
+import { t } from './i18n/index.js'
 import type { SkillSummary } from './skills.js'
 import type { McpServerSummary } from './mcp.js'
 
@@ -106,7 +107,7 @@ export class ToolRegistry {
     if (!tool) {
       return {
         ok: false,
-        output: `Unknown tool: ${toolName}`,
+        output: t('tool_unknown', { toolName }),
       }
     }
 

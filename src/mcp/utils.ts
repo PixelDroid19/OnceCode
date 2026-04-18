@@ -1,4 +1,5 @@
 import { readMcpTokensFile } from '../config.js'
+import { t } from '../i18n/index.js'
 import { getErrorCode } from '../utils/errors.js'
 
 /** Builds a descriptive Error for when an MCP server child process fails to start. */
@@ -12,18 +13,18 @@ export function formatChildProcessError(
   const detail =
     error instanceof Error ? error.message : String(error)
 
-  const lines = [`Failed to start MCP server "${serverName}" using command "${command}".`]
+  const lines = [t('mcp_start_failed', { name: serverName, command })]
 
   if (code === 'ENOENT') {
     lines.push(
-      `Command not found: ${command}. Install it first and ensure it is available in PATH.`,
+      t('mcp_command_not_found', { command }),
     )
   } else if (detail) {
     lines.push(detail)
   }
 
   if (detail && code === 'ENOENT') {
-    lines.push(`Original error: ${detail}`)
+    lines.push(t('mcp_original_error', { detail }))
   }
 
   if (stderrLines.length > 0) {

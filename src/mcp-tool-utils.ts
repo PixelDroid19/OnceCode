@@ -1,4 +1,5 @@
 import type { McpServerConfig } from './config.js'
+import { t } from './i18n/index.js'
 import type { ToolResult } from './tool.js'
 
 /** Returns a human-readable label for an MCP server (URL or command string). */
@@ -109,7 +110,7 @@ export function formatReadResourceResult(result: unknown): ToolResult {
   if (contents.length === 0) {
     return {
       ok: true,
-      output: 'No resource contents returned.',
+      output: t('mcp_no_resource_contents'),
     }
   }
 

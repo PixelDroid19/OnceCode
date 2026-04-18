@@ -40,7 +40,7 @@ describe('index cli entrypoint', () => {
 
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('OnceCode')
-    expect(result.stdout).toContain('这是一个最小骨架版本。')
+    expect(result.stdout).toContain('This is a minimal skeleton build.')
     expect(result.stderr).toBe('')
   })
 })

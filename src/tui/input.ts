@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js'
+
 const RESET = '\u001b[0m'
 const DIM = '\u001b[2m'
 const GREEN = '\u001b[32m'
@@ -11,8 +13,8 @@ export function renderInputPrompt(input: string, cursorOffset: number): string {
   const current = input[offset] ?? ' '
   const after = input.slice(Math.min(offset + 1, input.length))
   return [
-    `${YELLOW}${BOLD}prompt${RESET} ${DIM}Enter send | /help commands | Esc clear | Ctrl+C exit${RESET}`,
+    `${YELLOW}${BOLD}${t('ui_panel_prompt')}${RESET} ${DIM}${t('ui_input_hint')}${RESET}`,
     '',
-    `${GREEN}${BOLD}oncecode>${RESET} ${before}${REVERSE}${current}${RESET}${after}${DIM}${input ? '' : ' Ask for code, files, tasks, or MCP tools'}${RESET}`,
+    `${GREEN}${BOLD}oncecode>${RESET} ${before}${REVERSE}${current}${RESET}${after}${DIM}${input ? '' : ` ${t('ui_input_placeholder')}`}${RESET}`,
   ].join('\n')
 }

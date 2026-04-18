@@ -19,7 +19,7 @@ describe('mock-model', () => {
       ]),
     ).resolves.toEqual({
       type: 'assistant',
-      content: '文件内容如下：\n\nhello',
+      content: 'File contents:\n\nhello',
     })
   })
 })

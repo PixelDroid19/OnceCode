@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { t } from '../i18n/index.js'
 import type { ToolDefinition } from '../tool.js'
 import { fetchWebPage } from '../utils/web.js'
 
@@ -34,7 +35,11 @@ export const webFetchTool: ToolDefinition<Input> = {
       if (result.status >= 400) {
         return {
           ok: false,
-          output: `HTTP ${result.status} ${result.statusText}: ${input.url}`,
+          output: t('tool_http_error', {
+            status: result.status,
+            statusText: result.statusText,
+            url: input.url,
+          }),
         }
       }
 
@@ -56,7 +61,7 @@ export const webFetchTool: ToolDefinition<Input> = {
       const message = error instanceof Error ? error.message : String(error)
       return {
         ok: false,
-        output: `Web fetch failed: ${message}`,
+        output: t('tool_web_fetch_failed', { message }),
       }
     }
   },

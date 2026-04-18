@@ -1,4 +1,5 @@
 import type { AgentStep, ChatMessage, ModelAdapter } from './types.js'
+import { t } from './i18n/index.js'
 
 function lastUserMessage(messages: ChatMessage[]): string {
   const last = [...messages].reverse().find(message => message.role === 'user')
@@ -29,14 +30,18 @@ export class MockModelAdapter implements ModelAdapter {
       if (lastCall === 'list_files') {
         return {
           type: 'assistant',
-          content: `目录内容如下：\n\n${toolMessage.content}`,
+          content: t('mock_directory_contents', {
+            content: toolMessage.content,
+          }),
         }
       }
 
       if (lastCall === 'read_file') {
         return {
           type: 'assistant',
-          content: `文件内容如下：\n\n${toolMessage.content}`,
+          content: t('mock_file_contents', {
+            content: toolMessage.content,
+          }),
         }
       }
 
@@ -49,7 +54,9 @@ export class MockModelAdapter implements ModelAdapter {
 
       return {
         type: 'assistant',
-        content: `我拿到了工具结果：\n\n${toolMessage.content}`,
+        content: t('mock_tool_result', {
+          content: toolMessage.content,
+        }),
       }
     }
 
@@ -58,7 +65,7 @@ export class MockModelAdapter implements ModelAdapter {
     if (userText === '/tools') {
       return {
         type: 'assistant',
-        content: '可用工具：ask_user, list_files, grep_files, read_file, write_file, edit_file, run_command',
+        content: t('mock_available_tools'),
       }
     }
 
@@ -120,7 +127,7 @@ export class MockModelAdapter implements ModelAdapter {
       if (splitAt === -1) {
         return {
           type: 'assistant',
-          content: '用法: /write 路径::内容',
+          content: t('tool_write_usage'),
         }
       }
 
@@ -143,7 +150,7 @@ export class MockModelAdapter implements ModelAdapter {
       if (!targetPath || search === undefined || replace === undefined) {
         return {
           type: 'assistant',
-          content: '用法: /edit 路径::查找文本::替换文本',
+          content: t('tool_edit_usage'),
         }
       }
 
@@ -164,8 +171,8 @@ export class MockModelAdapter implements ModelAdapter {
     return {
       type: 'assistant',
       content: [
-        '这是一个最小骨架版本。',
-        '你可以试试：',
+        t('mock_skeleton_intro'),
+        t('mock_suggestions'),
         '/tools',
         '/ls',
         '/grep pattern::src',

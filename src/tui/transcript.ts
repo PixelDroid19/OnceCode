@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { t } from '../i18n/index.js'
 import { renderMarkdownish } from './markdown.js'
 import type { TranscriptEntry } from './types.js'
 import {
@@ -38,7 +39,7 @@ function previewToolBody(toolName: string, body: string): string {
   }
 
   if (limited !== body) {
-    return `${limited}\n${DIM}... output truncated in transcript${RESET}`
+    return `${limited}\n${DIM}${t('transcript_truncated')}${RESET}`
   }
 
   return limited
@@ -46,38 +47,38 @@ function previewToolBody(toolName: string, body: string): string {
 
 function renderTranscriptEntry(entry: TranscriptEntry): string {
   if (entry.kind === 'user') {
-    return `${CYAN}${BOLD}you${RESET}\n${indentBlock(entry.body)}`
+    return `${CYAN}${BOLD}${t('transcript_role_user')}${RESET}\n${indentBlock(entry.body)}`
   }
 
   if (entry.kind === 'assistant') {
-    return `${GREEN}${BOLD}assistant${RESET}\n${indentBlock(
+    return `${GREEN}${BOLD}${t('transcript_role_assistant')}${RESET}\n${indentBlock(
       renderMarkdownish(entry.body),
     )}`
   }
 
   if (entry.kind === 'progress') {
-    return `${YELLOW}${BOLD}progress${RESET}\n${indentBlock(
+    return `${YELLOW}${BOLD}${t('transcript_role_progress')}${RESET}\n${indentBlock(
       renderMarkdownish(entry.body),
     )}`
   }
 
   const status =
     entry.status === 'running'
-      ? `${YELLOW}running${RESET}`
+      ? `${YELLOW}${t('transcript_status_running')}${RESET}`
       : entry.status === 'success'
-        ? `${GREEN}ok${RESET}`
-        : `${RED}err${RESET}`
+        ? `${GREEN}${t('transcript_status_ok')}${RESET}`
+        : `${RED}${t('transcript_status_error')}${RESET}`
 
   const body =
     entry.status === 'running'
       ? entry.body
       : entry.collapsed
-        ? `${DIM}${entry.collapsedSummary ?? 'output collapsed'}${RESET}`
+        ? `${DIM}${entry.collapsedSummary ?? t('transcript_collapsed')}${RESET}`
         : entry.collapsePhase
-          ? `${DIM}collapsing${'.'.repeat(entry.collapsePhase)}${RESET}`
+          ? `${DIM}${t('transcript_collapsing')}${'.'.repeat(entry.collapsePhase)}${RESET}`
           : previewToolBody(entry.toolName, renderMarkdownish(entry.body))
 
-  return `${MAGENTA}${BOLD}tool${RESET} ${entry.toolName} ${status}\n${indentBlock(body)}`
+  return `${MAGENTA}${BOLD}${t('transcript_tool_label')}${RESET} ${entry.toolName} ${status}\n${indentBlock(body)}`
 }
 
 export function getTranscriptWindowSize(windowSize?: number): number {
@@ -136,5 +137,5 @@ export function renderTranscript(
     return body
   }
 
-  return `${body}\n\n${DIM}scroll offset: ${offset}${RESET}`
+  return `${body}\n\n${DIM}${t('transcript_scroll_offset', { offset: String(offset) })}${RESET}`
 }

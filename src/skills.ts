@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { SKILL_FILENAME } from './constants.js'
 import { ONCECODE_DIR } from './config-store.js'
+import { t } from './i18n/index.js'
 import { isEnoentError } from './utils/errors.js'
 
 /** Metadata for a discovered skill, without its full content. */
@@ -174,7 +175,7 @@ export async function installSkill(args: {
     const entries = await readdir(statPath, { withFileTypes: true })
     const skillFile = entries.find(entry => entry.isFile() && entry.name === SKILL_FILENAME)
     if (!skillFile) {
-      throw new Error(`No ${SKILL_FILENAME} found in ${statPath}`)
+      throw new Error(t('tool_no_skill_md', { path: statPath }))
     }
     content = await readFile(path.join(statPath, SKILL_FILENAME), 'utf8')
     inferredName = path.basename(statPath)
@@ -190,7 +191,7 @@ export async function installSkill(args: {
 
   const skillName = (args.name ?? inferredName).trim()
   if (!skillName) {
-    throw new Error('Skill name cannot be empty.')
+    throw new Error(t('tool_skill_name_empty'))
   }
 
   const targetRoot = getManagedSkillRoot(scope, args.cwd)
