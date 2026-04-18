@@ -5,7 +5,7 @@ const es = {
   cmd_config_desc: 'Mostrar el modelo actual y la fuente de configuración.',
   cmd_model_show_desc: 'Mostrar el modelo actual.',
   cmd_model_set_desc: 'Guardar una sobrescritura de modelo en ~/.oncecode/settings.json.',
-  cmd_paths_desc: 'Mostrar las rutas de configuración de OnceCode y la compatibilidad con Claude.',
+  cmd_paths_desc: 'Mostrar las rutas de configuración de OnceCode (incluida compatibilidad legacy con Claude Code).',
   cmd_skills_desc: 'Listar los flujos SKILL.md descubiertos.',
   cmd_mcp_desc: 'Mostrar los servidores MCP configurados y su estado de conexión.',
   cmd_permissions_desc: 'Mostrar la ruta de almacenamiento de permisos de OnceCode.',

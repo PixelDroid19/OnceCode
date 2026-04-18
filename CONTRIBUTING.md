@@ -2,7 +2,7 @@
 
 Thanks for contributing to OnceCode.
 
-OnceCode welcomes pull requests, but the project has a clear scope: it is meant to stay small, readable, and close in spirit to Claude Code's core design direction.
+OnceCode welcomes pull requests, but the project has a clear scope: it is meant to stay small, readable, and close in spirit to established agent design patterns.
 
 This document explains the baseline expectations for contributions.
 
@@ -21,15 +21,15 @@ OnceCode is intentionally small. New contributions should preserve:
 
 Changes that add large abstractions, deep indirection, or framework-heavy rewrites are usually not a good fit unless they are clearly necessary.
 
-### 2. Stay aligned with Claude Code's design direction
+### 2. Stay aligned with the project's design direction
 
-Because of the nature of this project, new features should remain close to Claude Code's source-level design direction wherever possible.
+Because of the nature of this project, new features should remain close to the project's design direction wherever possible.
 
 That does not mean copying everything mechanically. It means:
 
 - prefer similar architectural ideas over unrelated inventions
 - preserve the same mental model when adapting a feature
-- avoid introducing product behavior that clearly diverges from the Claude Code style without a strong reason
+- avoid introducing product behavior that clearly diverges from the established style without a strong reason
 
 OnceCode is a lightweight adaptation, not an unrelated terminal agent project.
 
@@ -134,7 +134,7 @@ Contributions are especially welcome in areas such as:
 - permission and review flow improvements
 - MCP compatibility
 - skills support
-- Claude Code-aligned architectural refinements
+- Architecturally-aligned refinements
 - documentation clarity
 
 ## What Usually Does Not Fit
@@ -142,7 +142,7 @@ Contributions are especially welcome in areas such as:
 These kinds of changes usually need a stronger justification:
 
 - large rewrites that increase architecture complexity significantly
-- features that move OnceCode away from Claude Code's design direction
+- features that move OnceCode away from its core design direction
 - new layers of abstraction with little practical payoff
 - heavy dependency additions for relatively small gains
 - behavior changes that make the project harder to study or modify
@@ -155,7 +155,7 @@ A good PR description should briefly explain:
 - why it is needed
 - which issue it is related to, if applicable
 - how it stays lightweight
-- how it aligns with Claude Code's design direction
+- how it aligns with OnceCode's design direction
 - how it was verified
 - how reviewers can reproduce and verify the change locally
 

@@ -8,7 +8,7 @@ import {
   renderSlashMenu,
   renderStatusLine,
   renderToolPanel,
-} from '../../../src/tui/chrome.js'
+} from '@/tui/chrome.js'
 
 const originalColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns')
 const originalRows = Object.getOwnPropertyDescriptor(process.stdout, 'rows')

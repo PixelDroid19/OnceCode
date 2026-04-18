@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchWebPage, searchDuckDuckGoLite } from '../../../src/utils/web.js'
+import { fetchWebPage, searchDuckDuckGoLite } from '@/utils/web.js'
 
 describe('utils/web', () => {
   afterEach(() => {

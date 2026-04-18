@@ -13,7 +13,7 @@ vi.mock('node:util', async () => {
 describe('tools/grep-files', () => {
   it('runs ripgrep and returns stdout', async () => {
     execFileAsync.mockResolvedValueOnce({ stdout: 'src/index.ts:1:test', stderr: '' })
-    const { grepFilesTool } = await import('../../../src/tools/grep-files.js')
+    const { grepFilesTool } = await import('@/tools/grep-files.js')
     const result = await grepFilesTool.run({ pattern: 'test' }, { cwd: process.cwd() })
     expect(result.ok).toBe(true)
     expect(result.output).toContain('src/index.ts:1:test')

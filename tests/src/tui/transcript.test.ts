@@ -3,7 +3,7 @@ import {
   getTranscriptMaxScrollOffset,
   getTranscriptWindowSize,
   renderTranscript,
-} from '../../../src/tui/transcript.js'
+} from '@/tui/transcript.js'
 
 describe('tui/transcript', () => {
   it('computes transcript window size safely', () => {

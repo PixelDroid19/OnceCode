@@ -1,0 +1,304 @@
+import type { ToolRegistry } from '@/tools/framework.js'
+import type { ChatMessage, ModelAdapter, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
+import type { RuntimeConfig } from '@/config/runtime.js'
+import { resolveMaxOutputTokens } from '@/context/window.js'
+import {
+  extractErrorMessage,
+  getRetryDelayMs,
+  parseRetryAfterMs,
+  readJsonBody,
+  shouldRetryStatus,
+  sleep,
+} from '@/utils/http.js'
+import { t } from '@/i18n/index.js'
+
+const DEFAULT_MAX_RETRIES = 4
+
+type AnthropicContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: unknown }
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  | { type: string; [key: string]: unknown }
+
+type AnthropicMessage = {
+  role: 'user' | 'assistant'
+  content: AnthropicContentBlock[]
+}
+
+function getRetryLimit(): number {
+  const value = Number(process.env.ONCECODE_MAX_RETRIES)
+  if (!Number.isFinite(value) || value < 0) {
+    return DEFAULT_MAX_RETRIES
+  }
+  return Math.floor(value)
+}
+
+function isTextBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
+  type: 'text'
+}> {
+  return block.type === 'text' && typeof block.text === 'string'
+}
+
+function isToolUseBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
+  type: 'tool_use'
+}> {
+  return (
+    block.type === 'tool_use' &&
+    typeof block.id === 'string' &&
+    typeof block.name === 'string'
+  )
+}
+
+function parseAssistantText(content: string): {
+  content: string
+  kind?: 'final' | 'progress'
+} {
+  const trimmed = content.trim()
+  if (!trimmed) {
+    return { content: '' }
+  }
+
+  const markers: Array<{
+    prefix: string
+    kind: 'final' | 'progress'
+  }> = [
+    { prefix: '<final>', kind: 'final' },
+    { prefix: '[FINAL]', kind: 'final' },
+    { prefix: '<progress>', kind: 'progress' },
+    { prefix: '[PROGRESS]', kind: 'progress' },
+  ]
+
+  for (const marker of markers) {
+    if (trimmed.startsWith(marker.prefix)) {
+      const rawContent = trimmed.slice(marker.prefix.length).trim()
+      const closingTag =
+        marker.kind === 'progress'
+          ? /<\/progress>/gi
+          : /<\/final>/gi
+      return {
+        content: rawContent.replace(closingTag, '').trim(),
+        kind: marker.kind,
+      }
+    }
+  }
+
+  return { content: trimmed }
+}
+
+function toTextBlock(text: string): AnthropicContentBlock {
+  return { type: 'text', text }
+}
+
+function toAssistantText(message: Extract<ChatMessage, {
+  role: 'assistant' | 'assistant_progress'
+}>): string {
+  if (message.role === 'assistant_progress') {
+    return `<progress>\n${message.content}\n</progress>`
+  }
+
+  return message.content
+}
+
+function pushAnthropicMessage(
+  messages: AnthropicMessage[],
+  role: 'user' | 'assistant',
+  block: AnthropicContentBlock,
+): void {
+  const last = messages.at(-1)
+  if (last?.role === role) {
+    last.content.push(block)
+    return
+  }
+
+  messages.push({ role, content: [block] })
+}
+
+function toAnthropicMessages(messages: ChatMessage[]): {
+  system: string
+  messages: AnthropicMessage[]
+} {
+  const system = messages
+    .filter(message => message.role === 'system')
+    .map(message => message.content)
+    .join('\n\n')
+
+  const converted: AnthropicMessage[] = []
+
+  for (const message of messages) {
+    if (message.role === 'system') continue
+
+    if (message.role === 'user') {
+      pushAnthropicMessage(converted, 'user', toTextBlock(message.content))
+      continue
+    }
+
+    if (message.role === 'assistant' || message.role === 'assistant_progress') {
+      pushAnthropicMessage(
+        converted,
+        'assistant',
+        toTextBlock(toAssistantText(message)),
+      )
+      continue
+    }
+
+    if (message.role === 'assistant_tool_call') {
+      pushAnthropicMessage(converted, 'assistant', {
+        type: 'tool_use',
+        id: message.toolUseId,
+        name: message.toolName,
+        input: message.input,
+      })
+      continue
+    }
+
+    pushAnthropicMessage(converted, 'user', {
+      type: 'tool_result',
+      tool_use_id: message.toolUseId,
+      content: message.content,
+      is_error: message.isError,
+    })
+  }
+
+  return { system, messages: converted }
+}
+
+export class AnthropicModelAdapter implements ModelAdapter {
+  constructor(
+    private readonly tools: ToolRegistry,
+    private readonly getRuntimeConfig: () => Promise<RuntimeConfig>,
+  ) {}
+
+  async next(messages: ChatMessage[]) {
+    const runtime = await this.getRuntimeConfig()
+    const payload = toAnthropicMessages(messages)
+    const url = `${runtime.baseUrl.replace(/\/$/, '')}/v1/messages`
+    const maxOutputTokens = resolveMaxOutputTokens(
+      runtime.model,
+      runtime.maxOutputTokens,
+    )
+
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    }
+
+    if (runtime.authToken) {
+      headers.Authorization = `Bearer ${runtime.authToken}`
+    } else if (runtime.apiKey) {
+      headers['x-api-key'] = runtime.apiKey
+    }
+
+    const requestBody = {
+      model: runtime.model,
+      system: payload.system,
+      messages: payload.messages,
+      tools: this.tools.list().map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
+      })),
+      max_tokens: maxOutputTokens,
+    }
+
+    const maxRetries = getRetryLimit()
+    let response: Response | null = null
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+      })
+      if (response.ok) {
+        break
+      }
+      if (!shouldRetryStatus(response.status) || attempt >= maxRetries) {
+        break
+      }
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
+      await sleep(getRetryDelayMs(attempt + 1, retryAfterMs))
+    }
+
+    if (!response) {
+      throw new Error(t('agent_request_failed_no_response'))
+    }
+
+    const data = (await readJsonBody(response)) as {
+      stop_reason?: string
+      content?: AnthropicContentBlock[]
+      error?: { message?: string }
+      usage?: {
+        input_tokens?: number
+        output_tokens?: number
+        cache_creation_input_tokens?: number
+        cache_read_input_tokens?: number
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(extractErrorMessage(data, response.status))
+    }
+
+    const toolCalls: ToolCall[] = []
+    const textParts: string[] = []
+    const blockTypes: string[] = []
+    const ignoredBlockTypes = new Set<string>()
+
+    for (const block of data.content ?? []) {
+      blockTypes.push(block.type)
+
+      if (isTextBlock(block)) {
+        textParts.push(block.text)
+        continue
+      }
+
+      if (isToolUseBlock(block)) {
+        toolCalls.push({
+          id: block.id,
+          toolName: block.name,
+          input: block.input,
+        })
+        continue
+      }
+
+      ignoredBlockTypes.add(block.type)
+    }
+
+    const parsedText = parseAssistantText(textParts.join('\n').trim())
+    const diagnostics: StepDiagnostics = {
+      stopReason: data.stop_reason,
+      blockTypes,
+      ignoredBlockTypes: [...ignoredBlockTypes],
+    }
+
+    const usage: TokenUsage | undefined = data.usage
+      ? {
+          inputTokens: data.usage.input_tokens ?? 0,
+          outputTokens: data.usage.output_tokens ?? 0,
+          cacheCreationInputTokens: data.usage.cache_creation_input_tokens ?? 0,
+          cacheReadInputTokens: data.usage.cache_read_input_tokens ?? 0,
+        }
+      : undefined
+
+    if (toolCalls.length > 0) {
+      return {
+        type: 'tool_calls' as const,
+        calls: toolCalls,
+        content: parsedText.content || undefined,
+        contentKind:
+          parsedText.kind === 'progress'
+            ? ('progress' as const)
+            : undefined,
+        diagnostics,
+        usage,
+      }
+    }
+
+    return {
+      type: 'assistant' as const,
+      content: parsedText.content,
+      kind: parsedText.kind,
+      diagnostics,
+      usage,
+    }
+  }
+}

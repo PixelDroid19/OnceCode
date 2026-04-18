@@ -1,28 +1,28 @@
 import readline from 'node:readline'
 import process from 'node:process'
-import { AnthropicModelAdapter } from './anthropic-adapter.js'
+import { AnthropicModelAdapter } from './agent/anthropic-adapter.js'
 import {
   completeSlashCommand,
   findMatchingSlashCommands,
   tryHandleLocalCommand,
-} from './cli-commands.js'
-import { compactConversation } from './compaction.js'
-import { loadRuntimeConfig } from './config.js'
-import { readSettingsFile, ONCECODE_SETTINGS_PATH } from './config.js'
-import { ContextTracker } from './context-tracker.js'
+} from './commands/handlers.js'
+import { compactConversation } from './context/compaction.js'
+import { loadRuntimeConfig } from './config/runtime.js'
+import { readSettingsFile, ONCECODE_SETTINGS_PATH } from './config/runtime.js'
+import { ContextTracker } from './context/tracker.js'
 import { initializeI18n, t } from './i18n/index.js'
-import { maybeHandleManagementCommand } from './manage-cli.js'
-import { summarizeMcpServers } from './mcp-status.js'
-import { MockModelAdapter } from './mock-model.js'
-import { PermissionManager } from './permissions.js'
-import { buildSystemPrompt } from './prompt.js'
+import { maybeHandleManagementCommand } from './commands/manage.js'
+import { summarizeMcpServers } from './mcp/status.js'
+import { MockModelAdapter } from './agent/mock-model.js'
+import { PermissionManager } from './permissions/manager.js'
+import { buildSystemPrompt } from './session/prompt.js'
 import { refreshSystemPrompt } from './session/system-prompt.js'
 import { createDefaultToolRegistry, hydrateMcpTools } from './tools/index.js'
 import type { ChatMessage } from './types.js'
-import { renderBanner } from './ui.js'
-import { runTtyApp } from './tty-app.js'
-import { runAgentTurn } from './agent-loop.js'
-import type { OnceCodeSettings } from './config.js'
+import { renderBanner } from './tui/index.js'
+import { runTtyApp } from './tty/app.js'
+import { runAgentTurn } from './agent/loop.js'
+import type { OnceCodeSettings } from './config/runtime.js'
 
 async function main(): Promise<void> {
   const cwd = process.cwd()

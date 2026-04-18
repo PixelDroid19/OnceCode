@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { t } from '../i18n/index.js'
+import { t } from '@/i18n/index.js'
 import { renderMarkdownish } from './markdown.js'
 import type { TranscriptEntry } from './types.js'
 import {

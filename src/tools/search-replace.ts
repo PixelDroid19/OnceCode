@@ -1,5 +1,5 @@
-import type { ToolResult } from '../tool.js'
-import { t } from '../i18n/index.js'
+import type { ToolResult } from './framework.js'
+import { t } from '@/i18n/index.js'
 
 /** A single search string and its replacement, with optional global replace. */
 export type Replacement = {

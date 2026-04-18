@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { patchFileTool } from '../../../src/tools/patch-file.js'
+import { patchFileTool } from '@/tools/patch-file.js'
 import { makeTempDir, removeTempDir } from '../helpers/fs.js'
 
 describe('tools/patch-file', () => {

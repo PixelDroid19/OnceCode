@@ -1,15 +1,15 @@
 import { z } from 'zod'
-import type { McpServerConfig } from '../config.js'
+import type { McpServerConfig } from '@/config/runtime.js'
 import {
   createMcpPromptTools,
   createMcpResourceTools,
-} from '../mcp-helper-tools.js'
+} from './helper-tools.js'
 import {
   normalizeInputSchema,
   sanitizeToolSegment,
   summarizeServerEndpoint,
-} from '../mcp-tool-utils.js'
-import type { ToolDefinition } from '../tool.js'
+} from './tool-utils.js'
+import type { ToolDefinition } from '@/tools/framework.js'
 import { StreamableHttpMcpClient } from './http-client.js'
 import { readProtocolCache, writeProtocolCache } from './protocol-cache.js'
 import { StdioMcpClient } from './stdio-client.js'

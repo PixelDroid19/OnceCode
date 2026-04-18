@@ -1,6 +1,6 @@
 import {
   getPermissionPromptMaxScrollOffset,
-} from '../ui.js'
+} from '@/tui/index.js'
 import type { ScreenState } from './types.js'
 
 function getPendingApprovalMaxScrollOffset(state: ScreenState): number {
@@ -58,7 +58,7 @@ export function movePendingApprovalSelection(state: ScreenState, delta: number):
 export function createPermissionPromptHandler(
   state: ScreenState,
   rerender: () => void,
-): (request: import('../permissions.js').PermissionRequest) => Promise<import('../permissions.js').PermissionPromptResult> {
+): (request: import('@/permissions/manager.js').PermissionRequest) => Promise<import('@/permissions/manager.js').PermissionPromptResult> {
   return request =>
     new Promise(resolve => {
       state.pendingApproval = {

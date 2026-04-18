@@ -1,20 +1,20 @@
 import type { ScreenState, TtyAppArgs } from './types.js'
-import { DEFAULT_TERMINAL_ROWS } from '../tui/constants.js'
+import { DEFAULT_TERMINAL_ROWS } from '@/tui/constants.js'
 import {
   getTranscriptMaxScrollOffset,
-} from '../tui/transcript.js'
+} from '@/tui/transcript.js'
 import {
   renderBanner,
   renderPanel,
   renderSlashMenu,
-} from '../tui/chrome.js'
-import { renderInputPrompt } from '../tui/input.js'
+} from '@/tui/chrome.js'
+import { renderInputPrompt } from '@/tui/input.js'
 import {
   findMatchingSlashCommands,
   getSlashCommands,
-} from '../cli-commands.js'
-import type { SlashCommand } from '../cli-commands.js'
-import { summarizeMcpServers } from '../mcp-status.js'
+} from '@/commands/handlers.js'
+import type { SlashCommand } from '@/commands/handlers.js'
+import { summarizeMcpServers } from '@/mcp/status.js'
 
 /** Filters slash commands matching the current input prefix for autocomplete display. */
 export function getVisibleCommands(input: string): SlashCommand[] {

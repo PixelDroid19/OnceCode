@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { t } from '../i18n/index.js'
-import type { ToolDefinition } from '../tool.js'
-import { fetchWebPage } from '../utils/web.js'
+import { t } from '@/i18n/index.js'
+import type { ToolDefinition } from './framework.js'
+import { fetchWebPage } from '@/utils/web.js'
 
 type Input = {
   url: string

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ToolDefinition } from '../tool.js'
+import type { ToolDefinition } from './framework.js'
 
 type Input = {
   question: string

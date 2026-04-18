@@ -1,6 +1,6 @@
-import { readMcpTokensFile } from '../config.js'
-import { t } from '../i18n/index.js'
-import { getErrorCode } from '../utils/errors.js'
+import { readMcpTokensFile } from '@/config/runtime.js'
+import { t } from '@/i18n/index.js'
+import { getErrorCode } from '@/utils/errors.js'
 
 /** Builds a descriptive Error for when an MCP server child process fails to start. */
 export function formatChildProcessError(

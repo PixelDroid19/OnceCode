@@ -1,7 +1,7 @@
-import { buildSystemPrompt } from '../prompt.js'
-import type { ToolRegistry } from '../tool.js'
-import type { ChatMessage } from '../types.js'
-import type { PermissionManager } from '../permissions.js'
+import { buildSystemPrompt } from './prompt.js'
+import type { ToolRegistry } from '@/tools/framework.js'
+import type { ChatMessage } from '@/types.js'
+import type { PermissionManager } from '@/permissions/manager.js'
 
 /**
  * Rebuild the system prompt (messages[0]) using current tool, skill, and

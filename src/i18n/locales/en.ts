@@ -5,7 +5,7 @@ const en = {
   cmd_config_desc: 'Show current model and config source.',
   cmd_model_show_desc: 'Show the current model.',
   cmd_model_set_desc: 'Persist a model override into ~/.oncecode/settings.json.',
-  cmd_paths_desc: 'Show OnceCode and Claude fallback settings paths.',
+  cmd_paths_desc: 'Show OnceCode settings paths (including legacy Claude Code compat).',
   cmd_skills_desc: 'List discovered SKILL.md workflows.',
   cmd_mcp_desc: 'Show configured MCP servers and connection state.',
   cmd_permissions_desc: 'Show OnceCode permission storage path.',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderInputPrompt } from '../../../src/tui/input.js'
+import { renderInputPrompt } from '@/tui/input.js'
 
 function stripAnsi(value: string): string {
   return value.replace(/\u001b\[[0-9;]*m/g, '')

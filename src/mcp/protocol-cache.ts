@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { ONCECODE_DIR } from '../config-store.js'
-import type { JsonRpcProtocol, ProtocolCache } from './types.js'
+import { ONCECODE_DIR } from '@/config/store.js'
+import type { ProtocolCache } from './types.js'
 
 /** Path to the on-disk protocol negotiation cache. */
 export const MCP_PROTOCOL_CACHE_PATH = path.join(

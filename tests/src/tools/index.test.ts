@@ -3,16 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const discoverSkills = vi.fn()
 const createMcpBackedTools = vi.fn()
 
-vi.mock('../../../src/skills.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../src/skills.js')>('../../../src/skills.js')
+vi.mock('@/session/skills.js', async () => {
+  const actual = await vi.importActual<typeof import('@/session/skills.js')>('@/session/skills.js')
   return {
     ...actual,
     discoverSkills,
   }
 })
 
-vi.mock('../../../src/mcp.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../src/mcp.js')>('../../../src/mcp.js')
+vi.mock('@/mcp/registry.js', async () => {
+  const actual = await vi.importActual<typeof import('@/mcp/registry.js')>('@/mcp/registry.js')
   return {
     ...actual,
     createMcpBackedTools,
@@ -28,7 +28,7 @@ describe('tools/index', () => {
     discoverSkills.mockResolvedValueOnce([
       { name: 'frontend', description: 'Build UI', path: '/tmp', source: 'user' },
     ])
-    const { createDefaultToolRegistry } = await import('../../../src/tools/index.js')
+    const { createDefaultToolRegistry } = await import('@/tools/index.js')
     const registry = await createDefaultToolRegistry({ cwd: process.cwd(), runtime: { mcpServers: { fs: { command: 'node' } } } as never })
     expect(registry.list().map((tool) => tool.name)).toContain('read_file')
     expect(registry.getSkills()).toHaveLength(1)
@@ -50,7 +50,7 @@ describe('tools/index', () => {
       servers: [{ name: 'fs', command: 'node server.js', status: 'connected', toolCount: 1 }],
       dispose: vi.fn(async () => {}),
     })
-    const { createDefaultToolRegistry, hydrateMcpTools } = await import('../../../src/tools/index.js')
+    const { createDefaultToolRegistry, hydrateMcpTools } = await import('@/tools/index.js')
     const registry = await createDefaultToolRegistry({ cwd: process.cwd(), runtime: null })
     await hydrateMcpTools({ cwd: process.cwd(), runtime: { mcpServers: {} } as never, tools: registry })
     expect(registry.find('mcp__fs__read')).toBeTruthy()

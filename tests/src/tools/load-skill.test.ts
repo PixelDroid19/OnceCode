@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { createLoadSkillTool } from '../../../src/tools/load-skill.js'
+import { createLoadSkillTool } from '@/tools/load-skill.js'
 import { makeTempDir, removeTempDir } from '../helpers/fs.js'
 import { setEnv } from '../helpers/env.js'
 

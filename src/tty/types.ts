@@ -1,9 +1,9 @@
-import type { RuntimeConfig } from '../config.js'
-import type { ContextTracker } from '../context-tracker.js'
-import type { ToolRegistry } from '../tool.js'
-import type { ChatMessage, ModelAdapter } from '../types.js'
-import type { PermissionManager, PermissionPromptResult, PermissionRequest } from '../permissions.js'
-import type { TranscriptEntry } from '../tui/types.js'
+import type { RuntimeConfig } from '@/config/runtime.js'
+import type { ContextTracker } from '@/context/tracker.js'
+import type { ToolRegistry } from '@/tools/framework.js'
+import type { ChatMessage, ModelAdapter } from '@/types.js'
+import type { PermissionManager, PermissionPromptResult, PermissionRequest } from '@/permissions/manager.js'
+import type { TranscriptEntry } from '@/tui/types.js'
 
 /** Arguments needed to bootstrap the TTY-based interactive session. */
 export type TtyAppArgs = {

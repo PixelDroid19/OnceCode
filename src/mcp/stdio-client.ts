@@ -1,13 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import path from 'node:path'
-import type { McpServerConfig } from '../config.js'
-import { t } from '../i18n/index.js'
+import type { McpServerConfig } from '@/config/runtime.js'
+import { t } from '@/i18n/index.js'
 import {
   formatPromptResult,
   formatReadResourceResult,
   formatToolCallResult,
-} from '../mcp-tool-utils.js'
-import type { ToolResult } from '../tool.js'
+} from './tool-utils.js'
+import type { ToolResult } from '@/tools/framework.js'
 import type {
   JsonRpcMessage,
   JsonRpcProtocol,

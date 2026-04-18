@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { readFileTool } from '../../../src/tools/read-file.js'
+import { readFileTool } from '@/tools/read-file.js'
 import { makeTempDir, removeTempDir } from '../helpers/fs.js'
 
 describe('tools/read-file', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseInputChunk } from '../../../src/tui/input-parser.js'
+import { parseInputChunk } from '@/tui/input-parser.js'
 
 describe('tui/input-parser', () => {
   it('parses return, text and backspace', () => {

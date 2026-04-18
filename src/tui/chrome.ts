@@ -1,12 +1,12 @@
-import type { BackgroundTaskResult } from '../tool.js'
+import type { BackgroundTaskResult } from '@/tools/framework.js'
 import path from 'node:path'
 import process from 'node:process'
-import type { RuntimeConfig } from '../config.js'
-import type { ContextWarningLevel } from '../context-tracker.js'
-import type { SlashCommand } from '../cli-commands.js'
-import { APP_NAME } from '../constants.js'
-import { t } from '../i18n/index.js'
-import type { PermissionRequest } from '../permissions.js'
+import type { RuntimeConfig } from '@/config/runtime.js'
+import type { ContextWarningLevel } from '@/context/tracker.js'
+import type { SlashCommand } from '@/commands/handlers.js'
+import { APP_NAME } from '@/constants.js'
+import { t } from '@/i18n/index.js'
+import type { PermissionRequest } from '@/permissions/manager.js'
 import {
   COLLAPSED_DETAIL_LIMIT,
   DEFAULT_TERMINAL_COLS,

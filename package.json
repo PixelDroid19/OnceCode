@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "check": "tsc --noEmit",
-    "install-local": "tsx src/install.ts",
+    "install-local": "tsx src/workspace/install.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "test": "vitest run",

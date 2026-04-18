@@ -18,11 +18,11 @@
   A lightweight, highly efficient coding tool. Designed for speed, built for simplicity.
 </p>
 
-[DeepWiki](https://deepwiki.com/LiuMengxuan04/OnceCode) | [Architecture](./ARCHITECTURE.md) | [Contributing](./CONTRIBUTING.md) | [Roadmap](./ROADMAP.md) | [Learn Claude Code Design Through OnceCode](./CLAUDE_CODE_PATTERNS.md) | [License](./LICENSE)
+[DeepWiki](https://deepwiki.com/LiuMengxuan04/OnceCode) | [Architecture](./ARCHITECTURE.md) | [Contributing](./CONTRIBUTING.md) | [Roadmap](./ROADMAP.md) | [Learn OnceCode Design Patterns](./ONCECODE_PATTERNS.md) | [License](./LICENSE)
 
 A lightweight terminal coding assistant for local development workflows.
 
-OnceCode provides Claude Code-like workflow and architectural ideas in a much smaller implementation, making it especially useful for learning, experimentation, and custom tooling.
+OnceCode provides a production-grade workflow and architectural ideas in a much smaller implementation, making it especially useful for learning, experimentation, and custom tooling.
 
 You can also explore this project through [DeepWiki](https://deepwiki.com/LiuMengxuan04/OnceCode).
 
@@ -65,7 +65,7 @@ The project is intentionally compact, so the control flow, tool model, and TUI b
 - [Architecture Docs](#architecture-docs)
 - [Contributing](#contributing)
 - [Roadmap](#roadmap)
-- [Learn Claude Code Design Through OnceCode](#learn-claude-code-design-through-oncecode)
+- [Learn OnceCode Design Patterns](#design-patterns)
 - [Development](#development)
 
 ## Product Showcase Page
@@ -80,7 +80,7 @@ OnceCode is a good fit if you want:
 - a lightweight coding assistant instead of a large platform
 - a terminal UI with tool calling, transcript, and command workflow
 - a small codebase that is suitable for study and modification
-- a reference implementation for Claude Code-like agent architecture
+- a reference implementation for terminal-based agent architecture
 
 ## Features
 
@@ -246,7 +246,7 @@ Example configuration:
 }
 ```
 
-Project-scoped MCP config is also supported through Claude Code compatible `.mcp.json`:
+Project-scoped MCP config is also supported through `.mcp.json`:
 
 ```json
 {
@@ -330,7 +330,7 @@ If you want to be even more explicit:
 Load the fullstack-dev skill first, then follow its workflow to implement this task.
 ```
 
-A common pattern is to clone an official or Claude Code-compatible skills repo locally and install from there:
+A common pattern is to clone an official or compatible skills repo locally and install from there:
 
 ```bash
 git clone https://github.com/MiniMax-AI/skills.git ~/minimax-skills
@@ -431,11 +431,11 @@ That means servers such as MiniMax MCP, which use newline-delimited JSON over st
 
 Star history can be added back once the public OnceCode repository URL is live.
 
-## Learn Claude Code Design Through OnceCode
+## Design Patterns
 
 If you want to study the project as a learning resource, continue with:
 
-- [What Claude Code Design Ideas You Can Learn Through OnceCode](./CLAUDE_CODE_PATTERNS.md)
+- [OnceCode Design Patterns](./ONCECODE_PATTERNS.md)
 
 ## Project Structure
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getErrorCode, isEnoentError } from '../../../src/utils/errors.js'
+import { getErrorCode, isEnoentError } from '@/utils/errors.js'
 
 describe('utils/errors', () => {
   it('extracts a direct error code', () => {

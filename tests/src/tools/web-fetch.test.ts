@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const fetchWebPage = vi.fn()
 
-vi.mock('../../../src/utils/web.js', () => ({
+vi.mock('@/utils/web.js', () => ({
   fetchWebPage,
 }))
 
@@ -20,7 +20,7 @@ describe('tools/web-fetch', () => {
       title: 'Demo',
       content: 'Hello world',
     })
-    const { webFetchTool } = await import('../../../src/tools/web-fetch.js')
+    const { webFetchTool } = await import('@/tools/web-fetch.js')
     const result = await webFetchTool.run({ url: 'https://example.com' }, { cwd: process.cwd() })
     expect(result.ok).toBe(true)
     expect(result.output).toContain('TITLE: Demo')
@@ -36,7 +36,7 @@ describe('tools/web-fetch', () => {
       title: null,
       content: '',
     })
-    const { webFetchTool } = await import('../../../src/tools/web-fetch.js')
+    const { webFetchTool } = await import('@/tools/web-fetch.js')
     const result = await webFetchTool.run({ url: 'https://example.com' }, { cwd: process.cwd() })
     expect(result).toEqual({ ok: false, output: 'HTTP 404 Not Found: https://example.com' })
   })

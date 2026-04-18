@@ -5,7 +5,7 @@
  * configuration knobs used by the stdio and HTTP client implementations.
  */
 
-import { APP_VERSION } from '../constants.js'
+import { APP_VERSION } from '@/constants.js'
 
 /** Protocol version negotiated during the MCP initialize handshake. */
 export const MCP_PROTOCOL_VERSION = '2024-11-05'

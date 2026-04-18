@@ -1,8 +1,8 @@
-import type { TranscriptEntry } from '../tui/types.js'
+import type { TranscriptEntry } from '@/tui/types.js'
 import {
   COLLAPSED_TOOL_LINE_LIMIT,
   DISPLAY_TRUNCATION_LIMIT,
-} from '../tui/constants.js'
+} from '@/tui/constants.js'
 import type { ScreenState, TranscriptEntryDraft } from './types.js'
 
 /** Appends a new entry to the transcript and returns its assigned ID. */

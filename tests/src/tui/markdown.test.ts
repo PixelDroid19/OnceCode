@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderMarkdownish } from '../../../src/tui/markdown.js'
+import { renderMarkdownish } from '@/tui/markdown.js'
 
 describe('tui/markdown', () => {
   it('renders headings, bullets and inline code', () => {

@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import { applyReviewedFileChange } from '../file-review.js'
-import { t } from '../i18n/index.js'
-import type { ToolDefinition } from '../tool.js'
-import { resolveToolPath } from '../workspace.js'
+import { applyReviewedFileChange } from '@/workspace/file-review.js'
+import { t } from '@/i18n/index.js'
+import type { ToolDefinition } from './framework.js'
+import { resolveToolPath } from '@/workspace/paths.js'
 import { applyReplacements, type Replacement } from './search-replace.js'
 
 type Input = {

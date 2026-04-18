@@ -5,7 +5,7 @@ import {
   exitAlternateScreen,
   hideCursor,
   showCursor,
-} from '../../../src/tui/screen.js'
+} from '@/tui/screen.js'
 
 describe('tui/screen', () => {
   afterEach(() => {

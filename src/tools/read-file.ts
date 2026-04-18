@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import type { ToolDefinition } from '../tool.js'
-import { resolveToolPath } from '../workspace.js'
+import type { ToolDefinition } from './framework.js'
+import { resolveToolPath } from '@/workspace/paths.js'
 
 type Input = {
   path: string

@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url'
 import { access } from 'node:fs/promises'
 import path from 'node:path'
-import { ONCECODE_DIR } from '../config-store.js'
+import { ONCECODE_DIR } from '@/config/store.js'
 import type { BuiltinLanguage, LanguageSetting } from './languages.js'
 import {
   detectSystemLanguage,

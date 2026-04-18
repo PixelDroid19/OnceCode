@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js'
+import { t } from '@/i18n/index.js'
 
 const RESET = '\u001b[0m'
 const DIM = '\u001b[2m'

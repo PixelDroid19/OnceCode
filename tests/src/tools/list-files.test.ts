@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { listFilesTool } from '../../../src/tools/list-files.js'
+import { listFilesTool } from '@/tools/list-files.js'
 import { makeTempDir, removeTempDir } from '../helpers/fs.js'
 
 describe('tools/list-files', () => {

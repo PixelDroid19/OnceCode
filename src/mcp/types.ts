@@ -6,7 +6,7 @@
  * streamable-HTTP transports.
  */
 
-import type { ToolResult } from '../tool.js'
+import type { ToolResult } from '@/tools/framework.js'
 
 /** A single JSON-RPC 2.0 message (request, response, or notification). */
 export type JsonRpcMessage = {

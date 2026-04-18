@@ -1,15 +1,15 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod'
-import { registerBackgroundShellTask } from '../background-tasks.js'
-import { t } from '../i18n/index.js'
-import type { ToolDefinition } from '../tool.js'
-import { splitCommandLine } from '../utils/command-line.js'
-import { resolveToolPath } from '../workspace.js'
+import { registerBackgroundShellTask } from '@/workspace/background-tasks.js'
+import { t } from '@/i18n/index.js'
+import type { ToolDefinition } from './framework.js'
+import { splitCommandLine } from '@/utils/command-line.js'
+import { resolveToolPath } from '@/workspace/paths.js'
 
 const execFileAsync = promisify(execFile)
 
-// Claude Code separates "read-only shell commands" from mutating/runtime commands.
+// OnceCode separates "read-only shell commands" from mutating/runtime commands.
 // We keep the same shape here so safe observability commands are easy to extend.
 const READONLY_COMMANDS = new Set([
   'pwd',

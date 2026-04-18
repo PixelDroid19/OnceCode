@@ -1,7 +1,7 @@
 import { getErrorCode } from './errors.js'
 import { sleep, shouldRetryStatus } from './http.js'
-import { APP_USER_AGENT } from '../constants.js'
-import { t } from '../i18n/index.js'
+import { APP_USER_AGENT } from '@/constants.js'
+import { t } from '@/i18n/index.js'
 
 type SearchResult = {
   title: string

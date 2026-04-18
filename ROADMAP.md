@@ -1,6 +1,6 @@
 # OnceCode Roadmap
 
-OnceCode already has a usable lightweight terminal coding workflow, but there is still a visible gap between the current `main` branch and a more complete Claude Code-like runtime.
+OnceCode already has a usable lightweight terminal coding workflow, but there is still a visible gap between the current `main` branch and a more complete agent runtime.
 
 This roadmap highlights the most valuable missing capabilities and the order in which they should ideally be improved.
 
@@ -21,7 +21,7 @@ It includes:
 - context usage display in the TUI
 - automatic context compaction for long conversations
 
-This work matters because long-session stability depends on it. It is also one of the most important design areas where OnceCode still trails a more complete Claude Code-style runtime.
+This work matters because long-session stability depends on it. It is also one of the most important design areas where OnceCode still trails a more complete agent-style runtime.
 
 ### 2. API retry and backoff
 
@@ -56,7 +56,7 @@ This is particularly valuable for the learning side of the project.
 The goal is not to fragment the main codebase immediately. The goal is to encourage language-specific branches or companion implementations that preserve the same core ideas:
 
 - lightweight architecture
-- Claude Code-aligned design direction
+- Production-aligned design direction
 - readable agent loop and tool model
 - educational value for contributors studying different ecosystems
 
@@ -66,7 +66,7 @@ If you are interested in maintaining or extending the Python or Rust variants, o
 
 ### 5. Layered memory loading
 
-OnceCode should support a lightweight memory hierarchy similar in spirit to Claude Code's layered project context.
+OnceCode should support a lightweight memory hierarchy similar in spirit to layered project context systems.
 
 This may include:
 
@@ -100,12 +100,12 @@ It is worth doing after the core runtime is more stable.
 
 ### 9. Expand the core toolset selectively
 
-OnceCode does not need to chase Claude Code's full tool count mechanically, but it does need to expand beyond the current minimal set over time.
+OnceCode does not need to chase a full tool count mechanically, but it does need to expand beyond the current minimal set over time.
 
 The direction here should be:
 
 - add tools that support core runtime capabilities
-- prefer Claude Code-aligned tool patterns over unrelated inventions
+- prefer established agent tool patterns over unrelated inventions
 - keep the built-in set small and high-value
 - continue to rely on MCP for many external or optional capabilities
 
@@ -148,7 +148,7 @@ If you want to contribute in these areas:
 
 - prefer focused PRs
 - keep the implementation lightweight
-- align the design with Claude Code's direction where possible
+- align the design with established agent patterns where possible
 - explain how the change was validated
 
 See:

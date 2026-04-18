@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod'
-import type { ToolDefinition } from '../tool.js'
-import { resolveToolPath } from '../workspace.js'
+import type { ToolDefinition } from './framework.js'
+import { resolveToolPath } from '@/workspace/paths.js'
 
 const execFileAsync = promisify(execFile)
 

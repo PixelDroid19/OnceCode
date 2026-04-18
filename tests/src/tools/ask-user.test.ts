@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { askUserTool } from '../../../src/tools/ask-user.js'
+import { askUserTool } from '@/tools/ask-user.js'
 
 describe('tools/ask-user', () => {
   it('returns awaitUser responses', async () => {
