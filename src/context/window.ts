@@ -232,6 +232,33 @@ export function shouldCompact(
 }
 
 /**
+ * Predicts whether the next request should compact by adding the estimated
+ * token cost of messages not reflected in the last provider-reported usage.
+ */
+export function shouldCompactNextTurn(args: {
+  model: string
+  lastInputTokens: number
+  messages: ChatMessage[]
+  configuredMaxOutputTokens?: number
+  alreadyCountedMessages?: ChatMessage[]
+}): boolean {
+  const {
+    model,
+    lastInputTokens,
+    messages,
+    configuredMaxOutputTokens,
+    alreadyCountedMessages = [],
+  } = args
+
+  const delta = Math.max(
+    0,
+    estimateMessagesTokenCount(messages) - estimateMessagesTokenCount(alreadyCountedMessages),
+  )
+
+  return lastInputTokens + delta >= getEffectiveContextBudget(model, configuredMaxOutputTokens)
+}
+
+/**
  * Total tokens consumed from a single-request usage report.
  * Includes input, output, and cache tokens.
  */

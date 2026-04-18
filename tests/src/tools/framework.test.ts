@@ -79,4 +79,42 @@ describe('tool registry', () => {
     await registry.dispose()
     expect(dispose).toHaveBeenCalledOnce()
   })
+
+  it('caches successful read-only tool results for a short period', async () => {
+    const run = vi.fn(async () => ({ ok: true, output: 'cached result' }))
+    const registry = new ToolRegistry([
+      {
+        name: 'read_file',
+        description: 'read tool',
+        inputSchema: {},
+        schema: z.object({ path: z.string() }),
+        run,
+      },
+    ])
+
+    const first = await registry.execute('read_file', { path: 'a.ts' }, { cwd: process.cwd() })
+    const second = await registry.execute('read_file', { path: 'a.ts' }, { cwd: process.cwd() })
+
+    expect(first).toEqual({ ok: true, output: 'cached result' })
+    expect(second).toEqual({ ok: true, output: 'cached result' })
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cache mutating tools', async () => {
+    const run = vi.fn(async () => ({ ok: true, output: 'mutated' }))
+    const registry = new ToolRegistry([
+      {
+        name: 'write_file',
+        description: 'write tool',
+        inputSchema: {},
+        schema: z.object({ path: z.string() }),
+        run,
+      },
+    ])
+
+    await registry.execute('write_file', { path: 'a.ts' }, { cwd: process.cwd() })
+    await registry.execute('write_file', { path: 'a.ts' }, { cwd: process.cwd() })
+
+    expect(run).toHaveBeenCalledTimes(2)
+  })
 })

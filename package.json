@@ -13,7 +13,8 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bench:compact": "tsx scripts/bench-context-compaction.ts"
   },
   "dependencies": {
     "diff": "^8.0.4",

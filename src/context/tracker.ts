@@ -1,4 +1,4 @@
-import type { TokenUsage } from '@/types.js'
+import type { ChatMessage, TokenUsage } from '@/types.js'
 import {
   CONTEXT_ERROR_THRESHOLD,
   CONTEXT_WARNING_THRESHOLD,
@@ -10,6 +10,7 @@ import {
   getEffectiveContextBudget,
   resolveMaxOutputTokens,
   shouldCompact,
+  shouldCompactNextTurn,
 } from './window.js'
 
 /** Warning level for TUI context usage display. */
@@ -22,6 +23,7 @@ export interface ContextSnapshot {
   maxOutputTokens: number
   effectiveBudget: number
   lastInputTokens: number
+  projectedPostCompactTokens: number
   totalInputTokens: number
   totalOutputTokens: number
   totalCacheCreation: number
@@ -52,6 +54,7 @@ export class ContextTracker {
   #totalCacheRead = 0
   #requestCount = 0
   #consecutiveCompactFailures = 0
+  #projectedPostCompactTokens = 0
 
   constructor(model: string, configuredMaxOutputTokens?: number) {
     this.#model = model
@@ -66,6 +69,7 @@ export class ContextTracker {
   /** Records a single API response's usage data. */
   recordUsage(usage: TokenUsage): void {
     this.#lastInputTokens = usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens
+    this.#projectedPostCompactTokens = 0
     this.#totalInputTokens += usage.inputTokens
     this.#totalOutputTokens += usage.outputTokens
     this.#totalCacheCreation += usage.cacheCreationInputTokens
@@ -73,12 +77,14 @@ export class ContextTracker {
     this.#requestCount += 1
   }
 
-  /** Resets accumulated totals after compaction. Keeps the model reference. */
-  resetAfterCompaction(): void {
-    this.#lastInputTokens = 0
+  /** Seeds tracker state from the projected post-compact context. */
+  resetAfterCompaction(projectedPostCompactTokens?: number): void {
+    const safeProjected = Math.max(0, Math.floor(projectedPostCompactTokens ?? 0))
+    this.#lastInputTokens = safeProjected
+    this.#projectedPostCompactTokens = safeProjected
     this.#consecutiveCompactFailures = 0
     // Keep cumulative totals — they represent session-lifetime usage.
-    // Only reset the "last" pointer so the next API call updates it.
+    // Seed the "last" pointer until the next API response replaces it.
   }
 
   /** Records a compaction failure for the circuit breaker. */
@@ -109,6 +115,23 @@ export class ContextTracker {
     return shouldCompact(this.#model, this.#lastInputTokens, this.#configuredMaxOutputTokens)
   }
 
+  /**
+   * Predicts whether the next request should compact after adding any pending
+   * messages that were not included in the last provider-reported usage.
+   */
+  shouldCompactNextTurn(
+    messages: ChatMessage[],
+    alreadyCountedMessages?: ChatMessage[],
+  ): boolean {
+    return shouldCompactNextTurn({
+      model: this.#model,
+      lastInputTokens: this.#lastInputTokens,
+      configuredMaxOutputTokens: this.#configuredMaxOutputTokens,
+      messages,
+      alreadyCountedMessages,
+    })
+  }
+
   /** Context usage as a 0–1 fraction. */
   get usageFraction(): number {
     return getContextUsageFraction(this.#model, this.#lastInputTokens)
@@ -132,6 +155,11 @@ export class ContextTracker {
     return this.#lastInputTokens
   }
 
+  /** Estimated context size immediately after compaction, before the next API response. */
+  get projectedPostCompactTokens(): number {
+    return this.#projectedPostCompactTokens
+  }
+
   /** Total API requests made in this session. */
   get requestCount(): number {
     return this.#requestCount
@@ -147,6 +175,7 @@ export class ContextTracker {
       maxOutputTokens,
       effectiveBudget: getEffectiveContextBudget(this.#model, this.#configuredMaxOutputTokens),
       lastInputTokens: this.#lastInputTokens,
+      projectedPostCompactTokens: this.#projectedPostCompactTokens,
       totalInputTokens: this.#totalInputTokens,
       totalOutputTokens: this.#totalOutputTokens,
       totalCacheCreation: this.#totalCacheCreation,

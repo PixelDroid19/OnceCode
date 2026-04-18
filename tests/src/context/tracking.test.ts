@@ -5,12 +5,17 @@ import {
   estimateTokenCount,
   estimateMessagesTokenCount,
   shouldCompact,
+  shouldCompactNextTurn,
   getContextUsageFraction,
 } from '@/context/window.js'
 import { ContextTracker, formatTokenCount } from '@/context/tracker.js'
 import type { ChatMessage, TokenUsage } from '@/types.js'
-import { microCompact, compactConversation } from '@/context/compaction.js'
-import { CLEARED_TOOL_OUTPUT } from '@/constants.js'
+import { microCompact, compactConversation, compactConversationBaseline } from '@/context/compaction.js'
+import {
+  CLEARED_TOOL_OUTPUT,
+  COMPACTED_PROGRESS_MESSAGE,
+  COMPACTED_TOOL_CALL_INPUT,
+} from '@/constants.js'
 
 // ── Context window size rules ──────────────────────────────────────
 
@@ -81,6 +86,42 @@ describe('shouldCompact', () => {
   })
 })
 
+describe('shouldCompactNextTurn', () => {
+  it('predicts compaction when new messages push the next request over budget', () => {
+    const alreadyCounted: ChatMessage[] = [
+      { role: 'user', content: 'a'.repeat(1000) },
+      { role: 'assistant', content: 'b'.repeat(1000) },
+    ]
+    const nextMessages: ChatMessage[] = [
+      ...alreadyCounted,
+      { role: 'user', content: 'x'.repeat(240_000) },
+    ]
+    expect(shouldCompactNextTurn({
+      model: 'claude-sonnet-4',
+      lastInputTokens: 60_000,
+      alreadyCountedMessages: alreadyCounted,
+      messages: nextMessages,
+    })).toBe(true)
+  })
+
+  it('does not compact when the projected next request remains under budget', () => {
+    const alreadyCounted: ChatMessage[] = [
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'world' },
+    ]
+    const nextMessages: ChatMessage[] = [
+      ...alreadyCounted,
+      { role: 'user', content: 'small input' },
+    ]
+    expect(shouldCompactNextTurn({
+      model: 'claude-sonnet-4',
+      lastInputTokens: 50_000,
+      alreadyCountedMessages: alreadyCounted,
+      messages: nextMessages,
+    })).toBe(false)
+  })
+})
+
 describe('getEffectiveContextBudget', () => {
   it('returns contextWindow - maxOutput - buffer', () => {
     const budget = getEffectiveContextBudget('claude-sonnet-4')
@@ -118,9 +159,11 @@ describe('ContextTracker', () => {
 
   it('records usage and updates percentage', () => {
     const tracker = new ContextTracker('claude-sonnet-4')
+    tracker.resetAfterCompaction(12_345)
     tracker.recordUsage(makeUsage(100_000))
     expect(tracker.usagePercent).toBe(50)
     expect(tracker.warningLevel).toBe('normal')
+    expect(tracker.projectedPostCompactTokens).toBe(0)
   })
 
   it('detects warning level', () => {
@@ -145,9 +188,10 @@ describe('ContextTracker', () => {
     const tracker = new ContextTracker('claude-sonnet-4')
     tracker.recordUsage(makeUsage(150_000))
     expect(tracker.shouldCompact()).toBe(true)
-    tracker.resetAfterCompaction()
+    tracker.resetAfterCompaction(12_345)
     expect(tracker.shouldCompact()).toBe(false)
-    expect(tracker.usagePercent).toBe(0)
+    expect(tracker.lastInputTokens).toBe(12_345)
+    expect(tracker.projectedPostCompactTokens).toBe(12_345)
   })
 
   it('produces a snapshot with all fields', () => {
@@ -194,6 +238,20 @@ describe('ContextTracker', () => {
     expect(summary).toContain('claude-sonnet-4')
     expect(summary).toContain('200K')
     expect(summary).toContain('25%')
+  })
+
+  it('predicts next-turn compaction using pending messages', () => {
+    const tracker = new ContextTracker('claude-sonnet-4')
+    const alreadyCounted: ChatMessage[] = [
+      { role: 'user', content: 'a'.repeat(1000) },
+      { role: 'assistant', content: 'b'.repeat(1000) },
+    ]
+    const nextMessages: ChatMessage[] = [
+      ...alreadyCounted,
+      { role: 'user', content: 'x'.repeat(240_000) },
+    ]
+    tracker.recordUsage(makeUsage(60_000))
+    expect(tracker.shouldCompactNextTurn(nextMessages, alreadyCounted)).toBe(true)
   })
 })
 
@@ -324,6 +382,49 @@ describe('microCompact', () => {
     microCompact(messages, 3)
     expect(messages[3]).toBe(original3) // original untouched
   })
+
+  it('compacts old assistant tool call inputs', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'prompt' },
+      { role: 'user', content: 'old question' },
+      {
+        role: 'assistant_tool_call',
+        toolUseId: '1',
+        toolName: 'write_file',
+        input: { path: 'file.ts', content: 'x'.repeat(600) },
+      },
+      { role: 'assistant', content: 'done' },
+      { role: 'user', content: 'a' },
+      { role: 'user', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'user', content: 'd' },
+    ]
+
+    const { messages: result, freedTokens } = microCompact(messages, 3)
+    const toolCall = result[2]!
+    expect(toolCall.role).toBe('assistant_tool_call')
+    expect((toolCall as Extract<ChatMessage, { role: 'assistant_tool_call' }>).input).toBe(COMPACTED_TOOL_CALL_INPUT)
+    expect(freedTokens).toBeGreaterThan(0)
+  })
+
+  it('compacts old assistant progress messages', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'prompt' },
+      { role: 'user', content: 'old question' },
+      { role: 'assistant_progress', content: 'Working... '.repeat(40) },
+      { role: 'assistant', content: 'done' },
+      { role: 'user', content: 'a' },
+      { role: 'user', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'user', content: 'd' },
+    ]
+
+    const { messages: result, freedTokens } = microCompact(messages, 3)
+    const progress = result[2]!
+    expect(progress.role).toBe('assistant_progress')
+    expect((progress as Extract<ChatMessage, { role: 'assistant_progress' }>).content).toBe(COMPACTED_PROGRESS_MESSAGE)
+    expect(freedTokens).toBeGreaterThan(0)
+  })
 })
 
 // ── Circuit breaker ─────────────────────────────────────────────────
@@ -404,6 +505,8 @@ describe('compactConversation', () => {
     expect(result!.beforeCount).toBe(7)
     expect(result!.afterCount).toBeGreaterThanOrEqual(3) // system + summary-user + ack-assistant + possible recent
     expect(result!.freedTokens).toBeGreaterThanOrEqual(0)
+    expect(result!.postCompactTokens).toBeGreaterThan(0)
+    expect(result!.workingMemory).toContain('## Working Memory')
     // Summary should be present in the first user message after system
     const summaryMsg = result!.messages.find(
       m => m.role === 'user' && m.content.includes('Summary of conversation'),
@@ -491,5 +594,219 @@ describe('compactConversation', () => {
       maxOutputTokens: 20_000,
       includeTools: false,
     })
+  })
+
+  it('keeps the recent tail verbatim after the token-aware split', async () => {
+    const mockModel = {
+      async next() {
+        return {
+          type: 'assistant' as const,
+          content: [
+            '## Goal',
+            'Do the work.',
+            '',
+            '## Instructions',
+            'Preserve constraints.',
+            '',
+            '## Discoveries',
+            'Important discovery.',
+            '',
+            '## Accomplished',
+            'Initial tasks done.',
+            '',
+            '## Current State',
+            'More work remains.',
+            '',
+            '## Relevant Files',
+            'src/app.ts',
+          ].join('\n'),
+        }
+      },
+    }
+    const recentUser = 'recent user message that must remain verbatim'
+    const recentAssistant = 'recent assistant response that must remain verbatim'
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'older '.repeat(100) },
+      { role: 'assistant', content: 'older response '.repeat(100) },
+      { role: 'user', content: 'mid '.repeat(100) },
+      { role: 'assistant', content: 'mid response '.repeat(100) },
+      { role: 'user', content: recentUser },
+      { role: 'assistant', content: recentAssistant },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    expect(result!.messages.some(m => m.role === 'user' && m.content === recentUser)).toBe(true)
+    expect(result!.messages.some(m => m.role === 'assistant' && m.content === recentAssistant)).toBe(true)
+  })
+
+  it('wraps malformed summaries into the required structure', async () => {
+    const mockModel = {
+      async next() {
+        return { type: 'assistant' as const, content: 'plain unstructured summary' }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'task 1' },
+      { role: 'assistant', content: 'done 1' },
+      { role: 'user', content: 'task 2' },
+      { role: 'assistant', content: 'done 2' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    const summaryMsg = result!.messages.find(m => m.role === 'user' && m.content.includes('## Goal'))
+    expect(summaryMsg).toBeDefined()
+    expect(summaryMsg!.content).toContain('## Relevant Files')
+    expect(summaryMsg!.content).toContain('plain unstructured summary')
+    expect(summaryMsg!.content).toContain('## Working Memory')
+  })
+
+  it('retries by shrinking older context when the compaction request is too long', async () => {
+    let callCount = 0
+    const mockModel = {
+      async next() {
+        callCount += 1
+        if (callCount === 1) {
+          throw new Error('prompt too long')
+        }
+        return {
+          type: 'assistant' as const,
+          content: [
+            '## Goal',
+            'Do the work.',
+            '',
+            '## Instructions',
+            'Preserve constraints.',
+            '',
+            '## Discoveries',
+            'Important discovery.',
+            '',
+            '## Accomplished',
+            'Initial tasks done.',
+            '',
+            '## Current State',
+            'More work remains.',
+            '',
+            '## Relevant Files',
+            'src/app.ts',
+          ].join('\n'),
+        }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'older '.repeat(160) },
+      { role: 'assistant', content: 'older response '.repeat(160) },
+      { role: 'user', content: 'mid '.repeat(140) },
+      { role: 'assistant', content: 'mid response '.repeat(140) },
+      { role: 'user', content: 'recent user turn '.repeat(25) },
+      { role: 'assistant', content: 'recent assistant turn '.repeat(25) },
+    ]
+
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    expect(callCount).toBe(2)
+  })
+
+  it('returns metadata about summarized and preserved recent messages', async () => {
+    const mockModel = {
+      async next() {
+        return {
+          type: 'assistant' as const,
+          content: [
+            '## Goal',
+            'Do the work.',
+            '',
+            '## Instructions',
+            'Preserve constraints.',
+            '',
+            '## Discoveries',
+            'Important discovery in src/app.ts.',
+            '',
+            '## Accomplished',
+            'Initial tasks done.',
+            '',
+            '## Current State',
+            'Continue editing src/app.ts and verify tests.',
+            '',
+            '## Relevant Files',
+            'src/app.ts',
+          ].join('\n'),
+        }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'older '.repeat(100) },
+      { role: 'assistant', content: 'older response '.repeat(100) },
+      { role: 'user', content: 'mid '.repeat(100) },
+      { role: 'assistant', content: 'mid response '.repeat(100) },
+      { role: 'user', content: 'recent user message' },
+      { role: 'assistant', content: 'recent assistant response' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    expect(result!.summarizedMessageCount).toBeGreaterThan(0)
+    expect(result!.preservedRecentMessageCount).toBeGreaterThan(0)
+    expect(result!.workingMemory).toContain('src/app.ts')
+    expect(result!.workingMemory).toContain('Continue editing src/app.ts')
+  })
+
+  it('improves context efficiency over the baseline by keeping a recent tail with lower total tokens than raw history', () => {
+    const summary = [
+      '## Goal',
+      'Do the work.',
+      '',
+      '## Instructions',
+      'Preserve constraints.',
+      '',
+      '## Discoveries',
+      'Important discovery.',
+      '',
+      '## Accomplished',
+      'Initial tasks done.',
+      '',
+      '## Current State',
+      'More work remains.',
+      '',
+      '## Relevant Files',
+      'src/app.ts',
+    ].join('\n')
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'older '.repeat(160) },
+      { role: 'assistant', content: 'older response '.repeat(160) },
+      { role: 'user', content: 'mid '.repeat(140) },
+      { role: 'assistant', content: 'mid response '.repeat(140) },
+      { role: 'user', content: 'recent user turn '.repeat(25) },
+      { role: 'assistant', content: 'recent assistant turn '.repeat(25) },
+    ]
+
+    const baseline = compactConversationBaseline({ messages, summary })
+    expect(baseline).not.toBeNull()
+    const improvedMessages = [
+      { role: 'system', content: 'sys' },
+      {
+        role: 'user' as const,
+        content: [
+          'This session is being continued from a previous conversation that was automatically compacted to save context space.',
+          'Here is a summary of the work so far:',
+          '',
+          summary,
+          '',
+          'Continue from where we left off. Do not repeat work already done.',
+        ].join('\n'),
+      },
+      {
+        role: 'assistant' as const,
+        content: 'I understand the context from the summary. I\'ll continue from where we left off without repeating completed work.',
+      },
+      { role: 'user', content: 'recent user turn '.repeat(25) },
+      { role: 'assistant', content: 'recent assistant turn '.repeat(25) },
+    ]
+
+    expect(estimateMessagesTokenCount(improvedMessages)).toBeLessThan(estimateMessagesTokenCount(messages))
+    expect(estimateMessagesTokenCount(improvedMessages)).toBeGreaterThan(estimateMessagesTokenCount(baseline!.messages))
   })
 })

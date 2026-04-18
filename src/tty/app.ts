@@ -226,7 +226,7 @@ async function handleInput(
       if (result) {
         args.messages.length = 0
         args.messages.push(...result.messages)
-        args.contextTracker.resetAfterCompaction()
+        args.contextTracker.resetAfterCompaction(result.postCompactTokens)
         pushTranscriptEntry(state, {
           kind: 'assistant',
           body: t('context_compacted', {
@@ -286,6 +286,7 @@ async function handleInput(
   }
 
   await refreshSystemPrompt(args)
+  const messagesBeforeUserInput = [...args.messages]
   args.messages.push({ role: 'user', content: input })
   pushTranscriptEntry(state, {
     kind: 'user',
@@ -297,7 +298,10 @@ async function handleInput(
   rerender()
 
   // ── Auto-compaction check before sending to model ───────────────
-  if (args.contextTracker.shouldCompact() && args.contextTracker.canAutoCompact()) {
+  if (
+    args.contextTracker.shouldCompactNextTurn(args.messages, messagesBeforeUserInput) &&
+    args.contextTracker.canAutoCompact()
+  ) {
     state.status = t('context_auto_compacting')
     rerender()
     try {
@@ -312,7 +316,7 @@ async function handleInput(
       if (result) {
         args.messages.length = 0
         args.messages.push(...result.messages)
-        args.contextTracker.resetAfterCompaction()
+        args.contextTracker.resetAfterCompaction(result.postCompactTokens)
         pushTranscriptEntry(state, {
           kind: 'progress',
           body: t('context_auto_compacted'),

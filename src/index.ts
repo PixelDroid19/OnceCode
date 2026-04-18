@@ -158,10 +158,14 @@ async function main(): Promise<void> {
       }
 
       await refreshSystemPrompt({ messages, cwd, permissions, tools })
+      const messagesBeforeUserInput = messages
       messages = [...messages, { role: 'user', content: input }]
 
       // Auto-compact before sending to model
-      if (contextTracker.shouldCompact() && contextTracker.canAutoCompact()) {
+      if (
+        contextTracker.shouldCompactNextTurn(messages, messagesBeforeUserInput) &&
+        contextTracker.canAutoCompact()
+      ) {
         try {
           const result = await compactConversation({
             model,
@@ -169,7 +173,7 @@ async function main(): Promise<void> {
           })
           if (result) {
             messages = result.messages
-            contextTracker.resetAfterCompaction()
+            contextTracker.resetAfterCompaction(result.postCompactTokens)
             console.log(`\n${t('context_auto_compacted')}\n`)
           } else {
             contextTracker.recordCompactFailure()

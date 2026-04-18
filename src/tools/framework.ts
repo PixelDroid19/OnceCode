@@ -37,6 +37,11 @@ export type ToolDefinition<TInput> = {
   run(input: TInput, context: ToolContext): Promise<ToolResult>
 }
 
+type CachedToolEntry = {
+  result: ToolResult
+  createdAt: number
+}
+
 type ToolRegistryMetadata = {
   skills?: SkillSummary[]
   mcpServers?: McpServerSummary[]
@@ -47,6 +52,16 @@ export class ToolRegistry {
   private readonly toolsStore: ToolDefinition<unknown>[]
   private metadataStore: ToolRegistryMetadata
   private readonly disposers: Array<() => Promise<void>> = []
+  private readonly resultCache = new Map<string, CachedToolEntry>()
+
+  private static readonly READ_ONLY_TOOLS = new Set([
+    'list_files',
+    'grep_files',
+    'read_file',
+  ])
+
+  private static readonly CACHE_TTL_MS = 2_000
+  private static readonly MAX_CACHE_ENTRIES = 64
 
   constructor(
     tools: ToolDefinition<unknown>[],
@@ -98,6 +113,52 @@ export class ToolRegistry {
     return this.toolsStore.find(tool => tool.name === name)
   }
 
+  private createCacheKey(
+    toolName: string,
+    input: unknown,
+    context: ToolContext,
+  ): string {
+    return JSON.stringify({
+      toolName,
+      cwd: context.cwd,
+      input,
+    })
+  }
+
+  private getCachedResult(key: string): ToolResult | null {
+    const cached = this.resultCache.get(key)
+    if (!cached) {
+      return null
+    }
+
+    if (Date.now() - cached.createdAt > ToolRegistry.CACHE_TTL_MS) {
+      this.resultCache.delete(key)
+      return null
+    }
+
+    return cached.result
+  }
+
+  private setCachedResult(key: string, result: ToolResult): void {
+    this.resultCache.set(key, {
+      result,
+      createdAt: Date.now(),
+    })
+
+    if (this.resultCache.size <= ToolRegistry.MAX_CACHE_ENTRIES) {
+      return
+    }
+
+    const oldestKey = this.resultCache.keys().next().value
+    if (oldestKey) {
+      this.resultCache.delete(oldestKey)
+    }
+  }
+
+  clearCache(): void {
+    this.resultCache.clear()
+  }
+
   async execute(
     toolName: string,
     input: unknown,
@@ -119,8 +180,24 @@ export class ToolRegistry {
       }
     }
 
+    const shouldCache = ToolRegistry.READ_ONLY_TOOLS.has(toolName)
+    const cacheKey = shouldCache
+      ? this.createCacheKey(toolName, parsed.data, context)
+      : null
+
+    if (cacheKey) {
+      const cached = this.getCachedResult(cacheKey)
+      if (cached) {
+        return cached
+      }
+    }
+
     try {
-      return await tool.run(parsed.data, context)
+      const result = await tool.run(parsed.data, context)
+      if (cacheKey && result.ok && !result.backgroundTask && !result.awaitUser) {
+        this.setCachedResult(cacheKey, result)
+      }
+      return result
     } catch (error) {
       return {
         ok: false,

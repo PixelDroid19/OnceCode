@@ -39,8 +39,29 @@ export const COMPACTION_BUFFER_TOKENS = 20_000
 /** Max output tokens allowed for the compaction summary request. */
 export const COMPACT_MAX_OUTPUT_TOKENS = 20_000
 
+/** Maximum number of retries when the compaction request itself is too large. */
+export const COMPACT_MAX_RETRIES = 3
+
+/** Fraction of the summarize-set to drop on each retry when compaction overflows. */
+export const COMPACT_RETRY_DROP_RATIO = 0.2
+
+/** Maximum token budget reserved for working memory carried inside the compacted context. */
+export const COMPACT_WORKING_MEMORY_MAX_TOKENS = 2_500
+
 /** Number of recent user turns whose tool outputs are protected from micro-compaction. */
 export const MICRO_COMPACT_PROTECT_TURNS = 3
+
+/** Minimum size before old assistant progress messages are compacted away. */
+export const MIN_PROGRESS_MESSAGE_CHARS = 120
+
+/** Minimum size before old tool call inputs are replaced with a compact placeholder. */
+export const MIN_TOOL_CALL_INPUT_CHARS = 160
+
+/** Placeholder text that replaces compacted old tool call inputs. */
+export const COMPACTED_TOOL_CALL_INPUT = '[Old tool call input compacted]'
+
+/** Placeholder text that replaces compacted old assistant progress messages. */
+export const COMPACTED_PROGRESS_MESSAGE = '[Old progress update compacted]'
 
 /** Maximum consecutive auto-compact failures before the circuit breaker disables auto-compaction. */
 export const MAX_CONSECUTIVE_COMPACT_FAILURES = 3
