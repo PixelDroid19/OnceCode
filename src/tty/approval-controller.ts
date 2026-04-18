@@ -11,6 +11,7 @@ function getPendingApprovalMaxScrollOffset(state: ScreenState): number {
   })
 }
 
+/** Scrolls the expanded permission prompt details by the given delta. */
 export function scrollPendingApprovalBy(state: ScreenState, delta: number): boolean {
   const pending = state.pendingApproval
   if (!pending || !pending.detailsExpanded) {
@@ -29,6 +30,7 @@ export function scrollPendingApprovalBy(state: ScreenState, delta: number): bool
   return true
 }
 
+/** Toggles the expanded/collapsed state of an edit approval's diff preview. */
 export function togglePendingApprovalExpand(state: ScreenState): boolean {
   const pending = state.pendingApproval
   if (!pending || pending.request.kind !== 'edit') {
@@ -39,6 +41,7 @@ export function togglePendingApprovalExpand(state: ScreenState): boolean {
   return true
 }
 
+/** Moves the highlighted choice up or down in the approval prompt. */
 export function movePendingApprovalSelection(state: ScreenState, delta: number): boolean {
   const pending = state.pendingApproval
   if (!pending || pending.feedbackMode) {
@@ -51,6 +54,7 @@ export function movePendingApprovalSelection(state: ScreenState, delta: number):
   return true
 }
 
+/** Creates the prompt handler that bridges permission requests to the TUI approval flow. */
 export function createPermissionPromptHandler(
   state: ScreenState,
   rerender: () => void,

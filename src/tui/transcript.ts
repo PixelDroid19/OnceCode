@@ -1,6 +1,13 @@
 import process from 'node:process'
 import { renderMarkdownish } from './markdown.js'
 import type { TranscriptEntry } from './types.js'
+import {
+  DEFAULT_TERMINAL_ROWS,
+  TOOL_PREVIEW_MAX_CHARS_DEFAULT,
+  TOOL_PREVIEW_MAX_CHARS_READ,
+  TOOL_PREVIEW_MAX_LINES_DEFAULT,
+  TOOL_PREVIEW_MAX_LINES_READ,
+} from './constants.js'
 
 const RESET = '\u001b[0m'
 const DIM = '\u001b[2m'
@@ -20,8 +27,8 @@ function indentBlock(input: string, prefix = '  '): string {
 }
 
 function previewToolBody(toolName: string, body: string): string {
-  const maxChars = toolName === 'read_file' ? 1000 : 1800
-  const maxLines = toolName === 'read_file' ? 20 : 36
+  const maxChars = toolName === 'read_file' ? TOOL_PREVIEW_MAX_CHARS_READ : TOOL_PREVIEW_MAX_CHARS_DEFAULT
+  const maxLines = toolName === 'read_file' ? TOOL_PREVIEW_MAX_LINES_READ : TOOL_PREVIEW_MAX_LINES_DEFAULT
   const lines = body.split('\n')
   const limitedLines = lines.length > maxLines ? lines.slice(0, maxLines) : lines
   let limited = limitedLines.join('\n')
@@ -77,7 +84,7 @@ export function getTranscriptWindowSize(windowSize?: number): number {
   if (windowSize !== undefined) {
     return Math.max(4, windowSize)
   }
-  const rows = process.stdout.rows ?? 40
+  const rows = process.stdout.rows ?? DEFAULT_TERMINAL_ROWS
   return Math.max(8, rows - 15)
 }
 

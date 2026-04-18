@@ -12,6 +12,7 @@ type Input = {
 const DEFAULT_READ_LIMIT = 8000
 const MAX_READ_LIMIT = 20000
 
+/** Tool that reads a workspace file with optional chunked pagination. */
 export const readFileTool: ToolDefinition<Input> = {
   name: 'read_file',
   description:

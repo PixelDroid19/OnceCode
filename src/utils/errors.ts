@@ -1,3 +1,4 @@
+/** Extracts a string `code` property from an error or its cause (e.g. Node.js system errors). */
 export function getErrorCode(error: unknown): string | null {
   if (
     typeof error === 'object' &&
@@ -21,6 +22,7 @@ export function getErrorCode(error: unknown): string | null {
   return null
 }
 
+/** Returns true if the error is a "file not found" (ENOENT) system error. */
 export function isEnoentError(error: unknown): boolean {
   return getErrorCode(error) === 'ENOENT'
 }

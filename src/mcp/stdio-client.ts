@@ -16,9 +16,14 @@ import type {
   PendingRequest,
 } from './types.js'
 import {
+  MCP_CLIENT_INFO,
   MCP_INITIALIZE_PROBE_TIMEOUT_MS,
   MCP_INITIALIZE_TIMEOUT_MS,
-} from './types.js'
+  MCP_LIST_TIMEOUT_MS,
+  MCP_PROTOCOL_VERSION,
+  MCP_READ_TIMEOUT_MS,
+  MCP_REQUEST_TIMEOUT_MS,
+} from './constants.js'
 import {
   formatChildProcessError,
   isInitializeTimeoutError,
@@ -103,12 +108,9 @@ export class StdioMcpClient {
     await this.request(
       'initialize',
       {
-        protocolVersion: '2024-11-05',
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
-        clientInfo: {
-          name: 'oncecode',
-          version: '0.1.0',
-        },
+        clientInfo: MCP_CLIENT_INFO,
       },
       timeoutMs,
     )
@@ -229,19 +231,19 @@ export class StdioMcpClient {
   }
 
   async listResources(): Promise<McpResourceDescriptor[]> {
-    const result = (await this.request('resources/list', {}, 3000)) as {
+    const result = (await this.request('resources/list', {}, MCP_LIST_TIMEOUT_MS)) as {
       resources?: McpResourceDescriptor[]
     }
     return result.resources ?? []
   }
 
   async readResource(uri: string): Promise<ToolResult> {
-    const result = await this.request('resources/read', { uri }, 5000)
+    const result = await this.request('resources/read', { uri }, MCP_READ_TIMEOUT_MS)
     return formatReadResourceResult(result)
   }
 
   async listPrompts(): Promise<McpPromptDescriptor[]> {
-    const result = (await this.request('prompts/list', {}, 3000)) as {
+    const result = (await this.request('prompts/list', {}, MCP_LIST_TIMEOUT_MS)) as {
       prompts?: McpPromptDescriptor[]
     }
     return result.prompts ?? []
@@ -257,7 +259,7 @@ export class StdioMcpClient {
         name,
         arguments: args ?? {},
       },
-      5000,
+      MCP_READ_TIMEOUT_MS,
     )
     return formatPromptResult(result)
   }
@@ -300,7 +302,7 @@ export class StdioMcpClient {
   private request(
     method: string,
     params: unknown,
-    timeoutMs = 5000,
+    timeoutMs = MCP_REQUEST_TIMEOUT_MS,
   ): Promise<unknown> {
     const id = this.nextId++
     return new Promise((resolve, reject) => {

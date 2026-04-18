@@ -32,6 +32,7 @@ function buildConnectingMcpSummaries(
   }))
 }
 
+/** Builds the initial tool registry with all built-in tools and discovered skills. */
 export async function createDefaultToolRegistry(args: {
   cwd: string
   runtime: RuntimeConfig | null
@@ -58,6 +59,7 @@ export async function createDefaultToolRegistry(args: {
   })
 }
 
+/** Connects to configured MCP servers and merges their tools into the registry. */
 export async function hydrateMcpTools(args: {
   cwd: string
   runtime: RuntimeConfig | null

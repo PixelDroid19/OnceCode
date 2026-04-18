@@ -8,6 +8,7 @@ import {
 } from './config.js'
 import type { ToolRegistry } from './tool.js'
 
+/** Definition of a user-facing slash command available in the REPL. */
 export type SlashCommand = {
   name: string
   usage: string
@@ -107,16 +108,19 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
 ]
 
+/** Formats all slash commands into a human-readable help listing. */
 export function formatSlashCommands(): string {
   return SLASH_COMMANDS.map(command => `${command.usage}  ${command.description}`).join('\n')
 }
 
+/** Returns slash command usage strings that match the given prefix for autocompletion. */
 export function findMatchingSlashCommands(input: string): string[] {
   return SLASH_COMMANDS
     .map(command => command.usage)
     .filter(command => command.startsWith(input))
 }
 
+/** Attempts to handle a slash command locally; returns null if the input is not a recognized command. */
 export async function tryHandleLocalCommand(
   input: string,
   context?: {

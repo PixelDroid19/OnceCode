@@ -1,6 +1,7 @@
 import { readMcpTokensFile } from '../config.js'
 import { getErrorCode } from '../utils/errors.js'
 
+/** Builds a descriptive Error for when an MCP server child process fails to start. */
 export function formatChildProcessError(
   serverName: string,
   command: string,
@@ -32,6 +33,7 @@ export function formatChildProcessError(
   return new Error(lines.join('\n'))
 }
 
+/** Checks if an error is the specific timeout during MCP initialize handshake. */
 export function isInitializeTimeoutError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -39,6 +41,7 @@ export function isInitializeTimeoutError(error: unknown): boolean {
   )
 }
 
+/** Coerces a string|number record to a string-only record. */
 export function toStringRecord(
   values: Record<string, string | number> | undefined,
 ): Record<string, string> {
@@ -48,6 +51,7 @@ export function toStringRecord(
   )
 }
 
+/** Expands `$VAR` and `${VAR}` references in a string from process.env. */
 export function interpolateEnv(value: string): string {
   return value.replace(/\$(\w+)|\$\{([^}]+)\}/g, (_match, simple, braced) => {
     const key = String(simple ?? braced ?? '').trim()
@@ -56,6 +60,7 @@ export function interpolateEnv(value: string): string {
   })
 }
 
+/** Converts a header config to string values with env var interpolation. */
 export function resolveHeaderRecord(
   values: Record<string, string | number> | undefined,
 ): Record<string, string> {
@@ -65,6 +70,7 @@ export function resolveHeaderRecord(
   )
 }
 
+/** Parses WWW-Authenticate headers for OAuth resource metadata hints. */
 export function extractAuthHint(headers: Headers): string | null {
   const challenges = headers.get('www-authenticate')
   if (!challenges) return null
@@ -82,6 +88,7 @@ export function extractAuthHint(headers: Headers): string | null {
 
 const mcpTokenCache = new Map<string, string>()
 
+/** Loads a cached bearer token for an MCP server from the token store. */
 export async function loadMcpToken(serverName: string): Promise<string | undefined> {
   if (mcpTokenCache.has(serverName)) {
     return mcpTokenCache.get(serverName)

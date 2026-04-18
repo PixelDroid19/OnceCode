@@ -1,5 +1,6 @@
 import type { ToolResult } from '../tool.js'
 
+/** A single search string and its replacement, with optional global replace. */
 export type Replacement = {
   search: string
   replace: string

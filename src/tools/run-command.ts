@@ -98,6 +98,7 @@ function stripTrailingBackgroundOperator(command: string): string {
   return command.trim().replace(/&\s*$/, '').trim()
 }
 
+/** Tool that executes allowlisted dev commands, with shell fallback for pipelines. */
 export const runCommandTool: ToolDefinition<Input> = {
   name: 'run_command',
   description:

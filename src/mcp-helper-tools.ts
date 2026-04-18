@@ -15,6 +15,7 @@ function getTargetClients(
   return [...clientsByServer.values()]
 }
 
+/** Creates tools for listing and reading MCP resources from connected servers. */
 export function createMcpResourceTools(
   clientsByServer: Map<string, McpClientLike>,
 ): ToolDefinition<unknown>[] {
@@ -91,6 +92,7 @@ export function createMcpResourceTools(
   ]
 }
 
+/** Creates tools for listing and fetching MCP prompts from connected servers. */
 export function createMcpPromptTools(
   clientsByServer: Map<string, McpClientLike>,
 ): ToolDefinition<unknown>[] {

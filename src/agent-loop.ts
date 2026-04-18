@@ -64,6 +64,7 @@ function isRecoverableThinkingStop(args: {
   return (args.ignoredBlockTypes ?? []).includes('thinking')
 }
 
+/** Drives the model in a loop, executing tool calls until the agent yields a final response. */
 export async function runAgentTurn(args: {
   model: ModelAdapter
   tools: ToolRegistry

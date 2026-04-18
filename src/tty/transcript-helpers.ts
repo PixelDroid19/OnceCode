@@ -1,6 +1,11 @@
 import type { TranscriptEntry } from '../tui/types.js'
+import {
+  COLLAPSED_TOOL_LINE_LIMIT,
+  DISPLAY_TRUNCATION_LIMIT,
+} from '../tui/constants.js'
 import type { ScreenState, TranscriptEntryDraft } from './types.js'
 
+/** Appends a new entry to the transcript and returns its assigned ID. */
 export function pushTranscriptEntry(
   state: ScreenState,
   entry: TranscriptEntryDraft,
@@ -10,6 +15,7 @@ export function pushTranscriptEntry(
   return id
 }
 
+/** Updates a tool transcript entry's status and body text. */
 export function updateToolEntry(
   state: ScreenState,
   entryId: number,
@@ -31,6 +37,7 @@ export function updateToolEntry(
   entry.collapsePhase = undefined
 }
 
+/** Collapses a completed tool entry to a single summary line. */
 export function collapseToolEntry(
   state: ScreenState,
   entryId: number,
@@ -47,6 +54,7 @@ export function collapseToolEntry(
   entry.collapsedSummary = summary
 }
 
+/** Returns all tool entries that are still in the "running" state. */
 export function getRunningToolEntries(state: ScreenState): Array<Extract<TranscriptEntry, { kind: 'tool' }>> {
   return state.transcript.filter(
     (entry): entry is Extract<TranscriptEntry, { kind: 'tool' }> =>
@@ -54,6 +62,7 @@ export function getRunningToolEntries(state: ScreenState): Array<Extract<Transcr
   )
 }
 
+/** Marks any still-running tool entries as errors when a turn ends unexpectedly. */
 export function finalizeDanglingRunningTools(state: ScreenState): void {
   const runningEntries = getRunningToolEntries(state)
   for (const entry of runningEntries) {
@@ -73,6 +82,7 @@ export function finalizeDanglingRunningTools(state: ScreenState): void {
   }
 }
 
+/** Extracts the first meaningful line from tool output for collapsed display. */
 export function summarizeCollapsedToolBody(output: string): string {
   const line = output
     .split('\n')
@@ -81,17 +91,18 @@ export function summarizeCollapsedToolBody(output: string): string {
   if (!line) {
     return 'output collapsed'
   }
-  if (line.length > 140) {
-    return `${line.slice(0, 140)}...`
+  if (line.length > COLLAPSED_TOOL_LINE_LIMIT) {
+    return `${line.slice(0, COLLAPSED_TOOL_LINE_LIMIT)}...`
   }
   return line
 }
 
-function truncateForDisplay(text: string, max = 180): string {
+function truncateForDisplay(text: string, max = DISPLAY_TRUNCATION_LIMIT): string {
   if (text.length <= max) return text
   return `${text.slice(0, max)}...`
 }
 
+/** Produces a compact one-line summary of a tool's input for the transcript. */
 export function summarizeToolInput(toolName: string, input: unknown): string {
   if (typeof input === 'string') {
     return truncateForDisplay(input.replace(/\s+/g, ' ').trim())
@@ -134,6 +145,7 @@ export function summarizeToolInput(toolName: string, input: unknown): string {
   }
 }
 
+/** Returns true if the tool modifies files (edit, patch, modify, write). */
 export function isFileEditTool(toolName: string): boolean {
   return (
     toolName === 'edit_file' ||
@@ -143,6 +155,7 @@ export function isFileEditTool(toolName: string): boolean {
   )
 }
 
+/** Extracts the `path` field from a tool's input object, if present. */
 export function extractPathFromToolInput(input: unknown): string | null {
   if (typeof input !== 'object' || input === null) {
     return null

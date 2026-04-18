@@ -30,6 +30,7 @@ async function runWholeFileWrite(
   return applyReviewedFileChange(context, input.path, target, input.content)
 }
 
+/** Tool that creates or overwrites a file with the given content. */
 export const writeFileTool: ToolDefinition<WholeFileInput> = {
   name: 'write_file',
   description: 'Write a UTF-8 text file relative to the workspace root.',
@@ -38,6 +39,7 @@ export const writeFileTool: ToolDefinition<WholeFileInput> = {
   run: runWholeFileWrite,
 }
 
+/** Tool alias that shows a diff for user approval before writing. */
 export const modifyFileTool: ToolDefinition<WholeFileInput> = {
   name: 'modify_file',
   description: 'Replace a file with reviewed content so the user can approve the diff first.',

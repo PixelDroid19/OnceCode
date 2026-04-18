@@ -1,6 +1,7 @@
 import type { McpServerConfig } from './config.js'
 import type { ToolResult } from './tool.js'
 
+/** Returns a human-readable label for an MCP server (URL or command string). */
 export function summarizeServerEndpoint(config: McpServerConfig): string {
   const remoteUrl = config.url?.trim()
   if (remoteUrl) return remoteUrl
@@ -9,6 +10,7 @@ export function summarizeServerEndpoint(config: McpServerConfig): string {
   return `${command} ${args}`.trim()
 }
 
+/** Converts arbitrary text to a safe lowercase slug for use in tool names. */
 export function sanitizeToolSegment(value: string): string {
   return (
     value
@@ -18,6 +20,7 @@ export function sanitizeToolSegment(value: string): string {
   )
 }
 
+/** Ensures an MCP tool's input schema is a valid JSON Schema object. */
 export function normalizeInputSchema(
   schema: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
@@ -47,6 +50,7 @@ function formatContentBlock(block: unknown): string {
   return JSON.stringify(block, null, 2)
 }
 
+/** Converts an MCP CallToolResult into the internal ToolResult format. */
 export function formatToolCallResult(result: unknown): ToolResult {
   if (!result || typeof result !== 'object') {
     return {
@@ -83,6 +87,7 @@ export function formatToolCallResult(result: unknown): ToolResult {
   }
 }
 
+/** Converts an MCP ReadResourceResult into the internal ToolResult format. */
 export function formatReadResourceResult(result: unknown): ToolResult {
   if (!result || typeof result !== 'object') {
     return {
@@ -132,6 +137,7 @@ export function formatReadResourceResult(result: unknown): ToolResult {
   }
 }
 
+/** Converts an MCP GetPromptResult into the internal ToolResult format. */
 export function formatPromptResult(result: unknown): ToolResult {
   if (!result || typeof result !== 'object') {
     return {

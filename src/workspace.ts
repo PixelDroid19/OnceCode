@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type { ToolContext } from './tool.js'
 
+/** Resolves a relative tool path to an absolute path after enforcing permission checks. */
 export async function resolveToolPath(
   context: ToolContext,
   targetPath: string,

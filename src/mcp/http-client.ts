@@ -12,7 +12,15 @@ import type {
   McpResourceDescriptor,
   McpToolDescriptor,
 } from './types.js'
-import { MCP_INITIALIZE_TIMEOUT_MS } from './types.js'
+import {
+  MCP_CLIENT_INFO,
+  MCP_INITIALIZE_TIMEOUT_MS,
+  MCP_LIST_TIMEOUT_MS,
+  MCP_NOTIFY_TIMEOUT_MS,
+  MCP_PROTOCOL_VERSION,
+  MCP_READ_TIMEOUT_MS,
+  MCP_REQUEST_TIMEOUT_MS,
+} from './constants.js'
 import {
   extractAuthHint,
   loadMcpToken,
@@ -38,12 +46,9 @@ export class StreamableHttpMcpClient {
     await this.request(
       'initialize',
       {
-        protocolVersion: '2024-11-05',
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
-        clientInfo: {
-          name: 'oncecode',
-          version: '0.1.0',
-        },
+        clientInfo: MCP_CLIENT_INFO,
       },
       MCP_INITIALIZE_TIMEOUT_MS,
     )
@@ -66,19 +71,19 @@ export class StreamableHttpMcpClient {
   }
 
   async listResources(): Promise<McpResourceDescriptor[]> {
-    const result = (await this.request('resources/list', {}, 3000)) as {
+    const result = (await this.request('resources/list', {}, MCP_LIST_TIMEOUT_MS)) as {
       resources?: McpResourceDescriptor[]
     }
     return result.resources ?? []
   }
 
   async readResource(uri: string): Promise<ToolResult> {
-    const result = await this.request('resources/read', { uri }, 5000)
+    const result = await this.request('resources/read', { uri }, MCP_READ_TIMEOUT_MS)
     return formatReadResourceResult(result)
   }
 
   async listPrompts(): Promise<McpPromptDescriptor[]> {
-    const result = (await this.request('prompts/list', {}, 3000)) as {
+    const result = (await this.request('prompts/list', {}, MCP_LIST_TIMEOUT_MS)) as {
       prompts?: McpPromptDescriptor[]
     }
     return result.prompts ?? []
@@ -91,7 +96,7 @@ export class StreamableHttpMcpClient {
         name,
         arguments: args ?? {},
       },
-      5000,
+      MCP_READ_TIMEOUT_MS,
     )
     return formatPromptResult(result)
   }
@@ -110,13 +115,13 @@ export class StreamableHttpMcpClient {
 
   private async notify(method: string, params: unknown): Promise<void> {
     try {
-      await this.postJsonRpc({ jsonrpc: '2.0', method, params }, 2000)
+      await this.postJsonRpc({ jsonrpc: '2.0', method, params }, MCP_NOTIFY_TIMEOUT_MS)
     } catch {
       // Some servers ignore notifications over plain HTTP response mode.
     }
   }
 
-  private async request(method: string, params: unknown, timeoutMs = 5000): Promise<unknown> {
+  private async request(method: string, params: unknown, timeoutMs = MCP_REQUEST_TIMEOUT_MS): Promise<unknown> {
     const id = this.nextId++
     const payload = await this.postJsonRpc(
       {

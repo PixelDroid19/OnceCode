@@ -1,5 +1,6 @@
 import type { McpServerSummary } from './mcp.js'
 
+/** Aggregate counts used to display MCP connection health in the TUI. */
 export type McpStatusSummary = {
   total: number
   connected: number
@@ -8,6 +9,7 @@ export type McpStatusSummary = {
   toolCount: number
 }
 
+/** Reduces a list of MCP server summaries into a single status overview. */
 export function summarizeMcpServers(
   mcpServers: McpServerSummary[],
 ): McpStatusSummary {

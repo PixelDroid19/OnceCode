@@ -12,6 +12,7 @@ type Input = {
   replaceAll?: boolean
 }
 
+/** Tool that performs a single exact-text search-and-replace in a file. */
 export const editFileTool: ToolDefinition<Input> = {
   name: 'edit_file',
   description: 'Edit a text file by replacing exact text.',

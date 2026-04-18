@@ -1,13 +1,16 @@
+/** Returns a promise that resolves after the specified delay. */
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, Math.max(0, ms))
   })
 }
 
+/** Checks if an HTTP status code is retryable (429 or 5xx). */
 export function shouldRetryStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status < 600)
 }
 
+/** Parses a Retry-After header value into milliseconds. */
 export function parseRetryAfterMs(retryAfter: string | null): number | null {
   if (!retryAfter) return null
   const asSeconds = Number(retryAfter)
@@ -22,6 +25,7 @@ export function parseRetryAfterMs(retryAfter: string | null): number | null {
   return Math.max(0, at - Date.now())
 }
 
+/** Computes retry delay with exponential backoff and jitter, honoring Retry-After. */
 export function getRetryDelayMs(attempt: number, retryAfterMs: number | null, options?: {
   baseDelayMs?: number
   maxDelayMs?: number
@@ -39,6 +43,7 @@ export function getRetryDelayMs(attempt: number, retryAfterMs: number | null, op
   return Math.floor(base + jitter)
 }
 
+/** Safely reads and parses a JSON response body, returning a fallback on failure. */
 export async function readJsonBody(response: Response): Promise<unknown> {
   const text = await response.text()
   if (!text.trim()) {
@@ -51,6 +56,7 @@ export async function readJsonBody(response: Response): Promise<unknown> {
   }
 }
 
+/** Extracts a human-readable error message from an API error response. */
 export function extractErrorMessage(data: unknown, status: number): string {
   if (typeof data === 'string' && data.trim()) {
     return data.trim()

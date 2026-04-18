@@ -4,6 +4,7 @@ import { createTwoFilesPatch } from 'diff'
 import type { ToolContext, ToolResult } from './tool.js'
 import { isEnoentError } from './utils/errors.js'
 
+/** Generates a compact unified diff string for display in the approval TUI. */
 export function buildUnifiedDiff(
   filePath: string,
   before: string,
@@ -31,6 +32,7 @@ export function buildUnifiedDiff(
   return raw
 }
 
+/** Reads a file's current content, returning empty string if the file doesn't exist yet. */
 export async function loadExistingFile(targetPath: string): Promise<string> {
   try {
     return await readFile(targetPath, 'utf8')
@@ -43,6 +45,7 @@ export async function loadExistingFile(targetPath: string): Promise<string> {
   }
 }
 
+/** Diffs new content against the existing file, prompts for edit approval, then writes. */
 export async function applyReviewedFileChange(
   context: ToolContext,
   filePath: string,

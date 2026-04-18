@@ -4,6 +4,14 @@ import process from 'node:process'
 import type { RuntimeConfig } from '../config.js'
 import type { SlashCommand } from '../cli-commands.js'
 import type { PermissionRequest } from '../permissions.js'
+import {
+  COLLAPSED_DETAIL_LIMIT,
+  DEFAULT_TERMINAL_COLS,
+  DEFAULT_TERMINAL_ROWS,
+  EXPANDED_WINDOW_MARGIN,
+  EXPANDED_WINDOW_MIN_ROWS,
+  MIN_TERMINAL_WIDTH,
+} from './constants.js'
 
 const RESET = '\u001b[0m'
 const DIM = '\u001b[2m'
@@ -198,6 +206,7 @@ function wrapPanelBodyLine(line: string, width: number): string[] {
   return parts
 }
 
+/** Wraps body content in a bordered panel with a title row. */
 export function renderPanel(
   title: string,
   body: string,
@@ -206,7 +215,7 @@ export function renderPanel(
     minBodyLines?: number
   } = {},
 ): string {
-  const width = Math.max(60, process.stdout.columns ?? 100)
+  const width = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
   const bodyLines = body.length > 0 ? body.split('\n') : []
   const renderedLines = bodyLines.flatMap(line => wrapPanelBodyLine(line, width))
   const minBodyLines = options.minBodyLines ?? 0
@@ -229,6 +238,7 @@ export function renderPanel(
   ].join('\n')
 }
 
+/** Renders the top-of-screen banner showing project, model, and session metadata. */
 export function renderBanner(
   runtime: RuntimeConfig | null,
   cwd: string,
@@ -243,7 +253,7 @@ export function renderBanner(
     mcpErrorCount: number
   },
 ): string {
-  const panelWidth = Math.max(60, process.stdout.columns ?? 100)
+  const panelWidth = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
   const panelInner = Math.max(0, panelWidth - 4)
   const cwdName = path.basename(cwd) || cwd
   const model = runtime?.model ?? 'not-configured'
@@ -292,11 +302,13 @@ export function renderBanner(
   )
 }
 
+/** Formats the current status as a colorized inline label. */
 export function renderStatusLine(status: string | null): string {
   if (!status) return `${DIM}Ready${RESET}`
   return `${YELLOW}${BOLD}${status}${RESET}`
 }
 
+/** Renders a compact summary of active and recent tool invocations. */
 export function renderToolPanel(
   activeTool: string | null,
   recentTools: Array<{ name: string; status: 'success' | 'error' }>,
@@ -330,6 +342,7 @@ export function renderToolPanel(
   return `${DIM}tools${RESET}  ${items.join('  ')}`
 }
 
+/** Renders the bottom status bar with tool, skill, and MCP connection state. */
 export function renderFooterBar(
   status: string | null,
   toolsEnabled: boolean,
@@ -343,7 +356,7 @@ export function renderFooterBar(
   },
   backgroundTasks: BackgroundTaskResult[] = [],
 ): string {
-  const width = Math.max(60, process.stdout.columns ?? 100)
+  const width = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
   const left = renderStatusLine(status)
   const runningBackground = backgroundTasks.filter(task => task.status === 'running')
   const backgroundSummary =
@@ -363,6 +376,7 @@ export function renderFooterBar(
   return `${left}${' '.repeat(gap)}${right}`
 }
 
+/** Renders the slash command autocomplete menu with selection highlight. */
 export function renderSlashMenu(
   commands: SlashCommand[],
   selectedIndex: number,
@@ -409,19 +423,18 @@ function sliceVisibleDetails(
   scrollOffset: number,
 ): { lines: string[]; maxScroll: number; hiddenCount: number } {
   if (!expanded) {
-    const collapsedLimit = 16
-    if (detailLines.length <= collapsedLimit) {
+    if (detailLines.length <= COLLAPSED_DETAIL_LIMIT) {
       return { lines: detailLines, maxScroll: 0, hiddenCount: 0 }
     }
     return {
-      lines: detailLines.slice(0, collapsedLimit),
+      lines: detailLines.slice(0, COLLAPSED_DETAIL_LIMIT),
       maxScroll: 0,
-      hiddenCount: detailLines.length - collapsedLimit,
+      hiddenCount: detailLines.length - COLLAPSED_DETAIL_LIMIT,
     }
   }
 
-  const rows = process.stdout.rows ?? 40
-  const expandedWindow = Math.max(8, rows - 20)
+  const rows = process.stdout.rows ?? DEFAULT_TERMINAL_ROWS
+  const expandedWindow = Math.max(EXPANDED_WINDOW_MIN_ROWS, rows - EXPANDED_WINDOW_MARGIN)
   const maxScroll = Math.max(0, detailLines.length - expandedWindow)
   const offset = Math.max(0, Math.min(scrollOffset, maxScroll))
   const start = offset
@@ -433,6 +446,7 @@ function sliceVisibleDetails(
   }
 }
 
+/** Returns the maximum scroll offset for the permission prompt detail view. */
 export function getPermissionPromptMaxScrollOffset(
   request: PermissionRequest,
   options: PermissionPromptRenderOptions = {},
@@ -446,11 +460,12 @@ export function getPermissionPromptMaxScrollOffset(
   if (!expanded) {
     return 0
   }
-  const rows = process.stdout.rows ?? 40
-  const expandedWindow = Math.max(8, rows - 20)
+  const rows = process.stdout.rows ?? DEFAULT_TERMINAL_ROWS
+  const expandedWindow = Math.max(EXPANDED_WINDOW_MIN_ROWS, rows - EXPANDED_WINDOW_MARGIN)
   return Math.max(0, detailLines.length - expandedWindow)
 }
 
+/** Renders the permission approval prompt with diff details and action choices. */
 export function renderPermissionPrompt(
   request: PermissionRequest,
   options: PermissionPromptRenderOptions = {},

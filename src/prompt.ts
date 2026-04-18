@@ -4,6 +4,7 @@ import type { McpServerSummary } from './mcp.js'
 import type { SkillSummary } from './skills.js'
 import { readTextFileOrNull } from './utils/fs.js'
 
+/** Assembles the full system prompt from base instructions, user/project CLAUDE.md files, and runtime context. */
 export async function buildSystemPrompt(
   cwd: string,
   permissionSummary: string[] = [],

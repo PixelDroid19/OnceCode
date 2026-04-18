@@ -1,5 +1,6 @@
 import { readdir } from 'node:fs/promises'
 import { z } from 'zod'
+import { MAX_LIST_FILES_RESULTS } from '../constants.js'
 import type { ToolDefinition } from '../tool.js'
 import { resolveToolPath } from '../workspace.js'
 
@@ -23,7 +24,7 @@ export const listFilesTool: ToolDefinition<Input> = {
     const target = await resolveToolPath(context, input.path ?? '.', 'list')
     const entries = await readdir(target, { withFileTypes: true })
     const lines = entries
-      .slice(0, 200)
+      .slice(0, MAX_LIST_FILES_RESULTS)
       .map(entry => `${entry.isDirectory() ? 'dir ' : 'file'} ${entry.name}`)
 
     return {

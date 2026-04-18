@@ -3,11 +3,13 @@ import type { PermissionManager } from './permissions.js'
 import type { SkillSummary } from './skills.js'
 import type { McpServerSummary } from './mcp.js'
 
+/** Execution context passed to every tool invocation. */
 export type ToolContext = {
   cwd: string
   permissions?: PermissionManager
 }
 
+/** Metadata for a command launched in the background (e.g. trailing `&`). */
 export type BackgroundTaskResult = {
   taskId: string
   type: 'local_bash'
@@ -17,6 +19,7 @@ export type BackgroundTaskResult = {
   startedAt: number
 }
 
+/** Standardized result returned by all tool implementations. */
 export type ToolResult = {
   ok: boolean
   output: string
@@ -24,6 +27,7 @@ export type ToolResult = {
   awaitUser?: boolean
 }
 
+/** Schema-validated tool with name, description, and run function. */
 export type ToolDefinition<TInput> = {
   name: string
   description: string
@@ -37,6 +41,7 @@ type ToolRegistryMetadata = {
   mcpServers?: McpServerSummary[]
 }
 
+/** Container for all available tools, with lookup, execution, and lifecycle management. */
 export class ToolRegistry {
   private readonly toolsStore: ToolDefinition<unknown>[]
   private metadataStore: ToolRegistryMetadata

@@ -17,6 +17,7 @@ import {
   saveScopedMcpServers,
 } from './config-store.js'
 
+/** User-facing settings stored in ~/.oncecode/settings.json. */
 export type OnceCodeSettings = {
   env?: Record<string, string | number>
   model?: string
@@ -24,6 +25,7 @@ export type OnceCodeSettings = {
   mcpServers?: Record<string, McpServerConfig>
 }
 
+/** Configuration for a single MCP server (stdio or HTTP). */
 export type McpServerConfig = {
   command: string
   args?: string[]
@@ -35,6 +37,7 @@ export type McpServerConfig = {
   protocol?: 'auto' | 'content-length' | 'newline-json' | 'streamable-http'
 }
 
+/** Fully resolved config derived from settings, env vars, and MCP configs. */
 export type RuntimeConfig = {
   model: string
   baseUrl: string
@@ -45,6 +48,7 @@ export type RuntimeConfig = {
   sourceSummary: string
 }
 
+/** Whether an MCP config applies globally or to the current project. */
 export type McpConfigScope = 'user' | 'project'
 
 export {
@@ -98,6 +102,7 @@ function mergeSettings(
   }
 }
 
+/** Merges all config sources (Claude settings, global MCP, project MCP, oncecode settings). */
 export async function loadEffectiveSettings(): Promise<OnceCodeSettings> {
   const [claudeSettings, globalMcpConfig, projectMcpConfig, onceCodeSettings] =
     await Promise.all([
@@ -115,6 +120,7 @@ export async function loadEffectiveSettings(): Promise<OnceCodeSettings> {
   )
 }
 
+/** Persists partial settings updates by merging them into the existing file. */
 export async function saveOnceCodeSettings(
   updates: OnceCodeSettings,
 ): Promise<void> {
@@ -128,6 +134,7 @@ export async function saveOnceCodeSettings(
   )
 }
 
+/** Builds the final runtime config from merged settings and environment variables. */
 export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   const effectiveSettings = await loadEffectiveSettings()
   const env = {

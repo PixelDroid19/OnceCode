@@ -40,6 +40,7 @@ function refreshRecord(record: BackgroundTaskRecord): BackgroundTaskRecord {
   }
 }
 
+/** Tracks a newly spawned background shell process so it can be queried later. */
 export function registerBackgroundShellTask(args: {
   command: string
   pid: number
@@ -58,10 +59,12 @@ export function registerBackgroundShellTask(args: {
   return task
 }
 
+/** Returns all tracked background tasks with refreshed status. */
 export function listBackgroundTasks(): BackgroundTaskResult[] {
   return [...tasks.values()].map(refreshRecord)
 }
 
+/** Looks up a single background task by ID, returning null if not found. */
 export function getBackgroundTask(taskId: string): BackgroundTaskResult | null {
   const task = tasks.get(taskId)
   if (!task) {

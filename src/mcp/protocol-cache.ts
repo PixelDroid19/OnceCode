@@ -1,14 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
+import { ONCECODE_DIR } from '../config-store.js'
 import type { JsonRpcProtocol, ProtocolCache } from './types.js'
 
+/** Path to the on-disk protocol negotiation cache. */
 export const MCP_PROTOCOL_CACHE_PATH = path.join(
-  os.homedir(),
-  '.oncecode',
+  ONCECODE_DIR,
   'mcp-protocol-cache.json',
 )
 
+/** Reads the cached protocol negotiation results from disk. */
 export async function readProtocolCache(): Promise<ProtocolCache> {
   try {
     const content = await readFile(MCP_PROTOCOL_CACHE_PATH, 'utf8')
@@ -32,6 +33,7 @@ export async function readProtocolCache(): Promise<ProtocolCache> {
   }
 }
 
+/** Persists the protocol negotiation cache to disk. */
 export async function writeProtocolCache(cache: ProtocolCache): Promise<void> {
   await mkdir(path.dirname(MCP_PROTOCOL_CACHE_PATH), { recursive: true })
   await writeFile(MCP_PROTOCOL_CACHE_PATH, `${JSON.stringify(cache, null, 2)}\n`, 'utf8')

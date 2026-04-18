@@ -1,4 +1,5 @@
 import type { ScreenState, TtyAppArgs } from './types.js'
+import { DEFAULT_TERMINAL_ROWS } from '../tui/constants.js'
 import {
   getTranscriptMaxScrollOffset,
 } from '../tui/transcript.js'
@@ -9,15 +10,18 @@ import {
 } from '../tui/chrome.js'
 import { renderInputPrompt } from '../tui/input.js'
 import { SLASH_COMMANDS, findMatchingSlashCommands } from '../cli-commands.js'
+import type { SlashCommand } from '../cli-commands.js'
 import { summarizeMcpServers } from '../mcp-status.js'
 
-export function getVisibleCommands(input: string) {
+/** Filters slash commands matching the current input prefix for autocomplete display. */
+export function getVisibleCommands(input: string): SlashCommand[] {
   if (!input.startsWith('/')) return []
   if (input === '/') return SLASH_COMMANDS
   const matches = findMatchingSlashCommands(input)
   return SLASH_COMMANDS.filter(command => matches.includes(command.usage))
 }
 
+/** Scrolls the transcript view by a delta, clamping to valid bounds. */
 export function scrollTranscriptBy(
   args: TtyAppArgs,
   state: ScreenState,
@@ -39,6 +43,7 @@ export function scrollTranscriptBy(
   return true
 }
 
+/** Jumps the transcript scroll position to the top or bottom edge. */
 export function jumpTranscriptToEdge(
   args: TtyAppArgs,
   state: ScreenState,
@@ -54,6 +59,7 @@ export function jumpTranscriptToEdge(
   return true
 }
 
+/** Navigates to the previous entry in command history. */
 export function historyUp(state: ScreenState): boolean {
   if (state.history.length === 0 || state.historyIndex <= 0) {
     return false
@@ -69,6 +75,7 @@ export function historyUp(state: ScreenState): boolean {
   return true
 }
 
+/** Navigates to the next entry in command history. */
 export function historyDown(state: ScreenState): boolean {
   if (state.historyIndex >= state.history.length) {
     return false
@@ -83,8 +90,9 @@ export function historyDown(state: ScreenState): boolean {
   return true
 }
 
+/** Calculates available lines for transcript content based on terminal size. */
 export function getTranscriptBodyLines(args: TtyAppArgs, state: ScreenState): number {
-  const rows = Math.max(24, process.stdout.rows ?? 40)
+  const rows = Math.max(24, process.stdout.rows ?? DEFAULT_TERMINAL_ROWS)
   const headerLines = renderHeaderPanel(args, state).split('\n').length
   const promptLines = renderPromptPanel(state).split('\n').length
   const footerLines = 1
@@ -121,6 +129,7 @@ function getSessionStats(args: TtyAppArgs, state: ScreenState) {
   }
 }
 
+/** Renders the top banner panel with project info and session stats. */
 export function renderHeaderPanel(args: TtyAppArgs, state: ScreenState): string {
   return renderBanner(
     args.runtime,
@@ -130,6 +139,7 @@ export function renderHeaderPanel(args: TtyAppArgs, state: ScreenState): string 
   )
 }
 
+/** Renders the input prompt panel with optional slash command menu. */
 export function renderPromptPanel(state: ScreenState): string {
   const commands = getVisibleCommands(state.input)
   const promptBody = [

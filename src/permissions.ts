@@ -13,6 +13,7 @@ import {
 } from './permission-rules.js'
 import type { PathIntent } from './permission-rules.js'
 
+/** The user's response to a permission prompt (allow/deny, scope, persistence). */
 export type PermissionDecision =
   | 'allow_once'
   | 'allow_always'
@@ -22,12 +23,14 @@ export type PermissionDecision =
   | 'deny_always'
   | 'deny_with_feedback'
 
+/** A selectable option presented in a permission prompt. */
 export type PermissionChoice = {
   key: string
   label: string
   decision: PermissionDecision
 }
 
+/** Result returned from the prompt handler, optionally with user feedback. */
 export type PermissionPromptResult = {
   decision: PermissionDecision
   feedback?: string
@@ -37,6 +40,7 @@ type EnsureCommandOptions = {
   forcePromptReason?: string
 }
 
+/** Describes an action that requires user approval before proceeding. */
 export type PermissionRequest = {
   kind: 'path' | 'command' | 'edit'
   summary: string
@@ -45,10 +49,12 @@ export type PermissionRequest = {
   choices: PermissionChoice[]
 }
 
+/** Callback that presents a permission request to the user and awaits their decision. */
 export type PermissionPromptHandler = (
   request: PermissionRequest,
 ) => Promise<PermissionPromptResult>
 
+/** Enforces path, command, and edit permissions with session and persistent allow/deny lists. */
 export class PermissionManager {
   private readonly allowedDirectoryPrefixes = new Set<string>()
   private readonly deniedDirectoryPrefixes = new Set<string>()
@@ -392,6 +398,7 @@ export class PermissionManager {
   }
 }
 
+/** Returns the filesystem path to the persisted permissions store. */
 export function getPermissionsPath(): string {
   return getStoredPermissionsPath()
 }

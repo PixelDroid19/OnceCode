@@ -36,22 +36,104 @@ In other words, OnceCode is a smaller, more controllable terminal coding assista
 - Telemetry / analytics
 - Compact / memory / session restore
 
-## Current implementation
+## Source layout
 
-- `src/index.ts`: CLI entry
-- `src/agent-loop.ts`: multi-turn tool-calling loop
-- `src/tool.ts`: registration, validation, execution
-- `src/tools/*`: `list_files` / `grep_files` / `read_file` / `write_file` / `edit_file` / `patch_file` / `modify_file` / `run_command` / `web_fetch` / `web_search` / `ask_user` / `load_skill`
-- `src/config.ts`: uses dedicated `~/.oncecode`
-- `src/skills.ts`: scans `.oncecode/skills` and compatible `.claude/skills` directories
-- `src/mcp.ts`: launches stdio MCP servers, negotiates framing compatibility, and wraps remote MCP tools into local tool definitions
-- `src/background-tasks.ts`: minimal background shell task registry used by `run_command` and the TUI
-- `src/manage-cli.ts`: manages persisted MCP configs and installed local skills
-- `src/anthropic-adapter.ts`: Anthropic-compatible Messages API adapter
-- `src/mock-model.ts`: offline fallback adapter
-- `src/permissions.ts`: path, command, and edit approval with allowlist / denylist
-- `src/file-review.ts`: diff review before writing files
-- `src/tui/*`: transcript / chrome / input / screen / markdown terminal components
+```
+src/
+├── constants.ts              Global app constants (name, version, limits)
+├── index.ts                  CLI entry point
+├── agent-loop.ts             Multi-turn model -> tool -> model loop
+├── anthropic-adapter.ts      Anthropic Messages API adapter
+├── mock-model.ts             Offline fallback adapter
+│
+├── config.ts                 Runtime and settings type definitions
+├── config-store.ts           Persistence helpers for ~/.oncecode JSON files
+│
+├── tool.ts                   Tool contract, registration, validation
+├── tools/
+│   ├── index.ts              Default tool registry factory
+│   ├── search-replace.ts     Shared search/replace engine for edit + patch tools
+│   ├── write-file.ts         write_file + modify_file (shared implementation)
+│   ├── modify-file.ts        Re-exports modify_file from write-file
+│   ├── edit-file.ts          Single search/replace edits
+│   ├── patch-file.ts         Multi-replacement patch operations
+│   ├── read-file.ts          Read file contents with line ranges
+│   ├── list-files.ts         Directory listing
+│   ├── grep-files.ts         Content search via ripgrep
+│   ├── run-command.ts        Shell command execution
+│   ├── web-fetch.ts          HTTP page fetching
+│   ├── web-search.ts         Web search via DuckDuckGo/Sogou
+│   ├── ask-user.ts           Interactive user prompts
+│   └── load-skill.ts         Dynamic skill loading
+│
+├── permissions.ts            Path, command, and edit approval with allowlists
+├── permission-rules.ts       Dangerous-command classification rules
+├── permission-store.ts       Persisted permission decisions
+├── file-review.ts            Diff review before writing files
+├── workspace.ts              Path resolution and sandbox enforcement
+│
+├── tty-app.ts                Full-screen TTY application shell
+├── tty/
+│   ├── types.ts              TTY state and screen types
+│   ├── state.ts              Navigation, scroll, history, render helpers
+│   ├── transcript-helpers.ts Transcript entry manipulation and formatting
+│   └── approval-controller.ts Permission approval prompt logic
+│
+├── tui/
+│   ├── constants.ts          Terminal layout constants (widths, rows, limits)
+│   ├── index.ts              Barrel re-exports for the TUI layer
+│   ├── chrome.ts             Panels, banners, borders, badges, diff colorizer
+│   ├── transcript.ts         Transcript rendering and scrolling
+│   ├── input.ts              Input prompt rendering
+│   ├── input-parser.ts       Raw terminal input → key event parser
+│   ├── screen.ts             Screen clearing and cursor management
+│   ├── markdown.ts           Lightweight terminal markdown renderer
+│   └── types.ts              Shared TUI type definitions
+├── ui.ts                     Public barrel re-exporting tui/* for consumers
+│
+├── mcp.ts                    Barrel re-exporting mcp/* for consumers
+├── mcp/
+│   ├── constants.ts          MCP timeout and protocol constants
+│   ├── types.ts              JSON-RPC, descriptor, and client interface types
+│   ├── utils.ts              Error formatting, env interpolation, auth helpers
+│   ├── protocol-cache.ts     On-disk protocol negotiation cache
+│   ├── stdio-client.ts       Stdio transport MCP client
+│   ├── http-client.ts        Streamable HTTP transport MCP client
+│   └── registry.ts           Server discovery and tool registration factory
+├── mcp-tool-utils.ts         MCP response formatting and schema normalization
+├── mcp-helper-tools.ts       Resource/prompt wrapper tools for MCP servers
+├── mcp-status.ts             MCP server status aggregation
+│
+├── session/
+│   └── system-prompt.ts      Shared system prompt builder (deduped)
+├── prompt.ts                 System prompt assembly from runtime + tools
+│
+├── skills.ts                 Skill discovery, loading, installation
+├── history.ts                Command history persistence
+├── cli-commands.ts           Slash command definitions and handling
+├── local-tool-shortcuts.ts   Shortcut syntax parsing (e.g. @file, !command)
+├── background-tasks.ts       Background shell task registry
+├── manage-cli.ts             CLI subcommands for MCP and skill management
+├── install.ts                Self-installer (npm global link)
+│
+├── utils/
+│   ├── fs.ts                 File-system helpers (readTextFileOrNull)
+│   ├── http.ts               HTTP retry helpers (sleep, shouldRetryStatus)
+│   ├── web.ts                Web fetching and search (DuckDuckGo, Sogou)
+│   ├── command-line.ts       Shell command-line tokenizer
+│   ├── errors.ts             Error code extraction utilities
+│   └── context.ts            Shared context types
+│
+└── types.ts                  Global shared type definitions
+```
+
+## Key patterns
+
+- **Barrel re-exports**: `mcp.ts` and `ui.ts` act as public API surfaces so internal module splits don't break consumers.
+- **Shared constants**: Magic numbers live in `constants.ts`, `mcp/constants.ts`, and `tui/constants.ts` instead of inline.
+- **Tool contract**: Every tool implements `ToolDefinition<T>` with a Zod schema and an `inputSchema` for the model.
+- **Permission flow**: Tools that modify the filesystem go through `applyReviewedFileChange` which shows a diff for user approval.
+- **MCP transport abstraction**: Both stdio and HTTP clients implement `McpClientLike` so the registry treats them uniformly.
 
 ## Why it is good for learning
 

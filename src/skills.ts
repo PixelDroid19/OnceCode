@@ -1,8 +1,11 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { SKILL_FILENAME } from './constants.js'
+import { ONCECODE_DIR } from './config-store.js'
 import { isEnoentError } from './utils/errors.js'
 
+/** Metadata for a discovered skill, without its full content. */
 export type SkillSummary = {
   name: string
   description: string
@@ -10,6 +13,7 @@ export type SkillSummary = {
   source: 'project' | 'user' | 'compat_project' | 'compat_user'
 }
 
+/** A skill summary along with the raw markdown content of the SKILL.md file. */
 export type LoadedSkill = SkillSummary & {
   content: string
 }
@@ -53,7 +57,7 @@ function getSkillRoots(cwd: string): SkillSourceRoot[] {
       source: 'project',
     },
     {
-      root: path.join(os.homedir(), '.oncecode', 'skills'),
+      root: path.join(ONCECODE_DIR, 'skills'),
       source: 'user',
     },
     {
@@ -70,7 +74,7 @@ function getSkillRoots(cwd: string): SkillSourceRoot[] {
 function getManagedSkillRoot(scope: SkillScope, cwd: string): string {
   return scope === 'project'
     ? path.join(cwd, '.oncecode', 'skills')
-    : path.join(os.homedir(), '.oncecode', 'skills')
+    : path.join(ONCECODE_DIR, 'skills')
 }
 
 async function listSkillDirs(root: SkillSourceRoot): Promise<LoadedSkill[]> {
@@ -83,7 +87,7 @@ async function listSkillDirs(root: SkillSourceRoot): Promise<LoadedSkill[]> {
         continue
       }
 
-      const skillPath = path.join(root.root, entry.name, 'SKILL.md')
+      const skillPath = path.join(root.root, entry.name, SKILL_FILENAME)
 
       try {
         const content = await readFile(skillPath, 'utf8')
@@ -95,7 +99,6 @@ async function listSkillDirs(root: SkillSourceRoot): Promise<LoadedSkill[]> {
           content,
         })
       } catch {
-        // Ignore malformed or missing skills.
       }
     }
 
@@ -105,6 +108,7 @@ async function listSkillDirs(root: SkillSourceRoot): Promise<LoadedSkill[]> {
   }
 }
 
+/** Scans all skill roots (project, user, compat) and returns de-duplicated summaries. */
 export async function discoverSkills(cwd: string): Promise<SkillSummary[]> {
   const byName = new Map<string, LoadedSkill>()
 
@@ -125,6 +129,7 @@ export async function discoverSkills(cwd: string): Promise<SkillSummary[]> {
   }))
 }
 
+/** Resolves and reads a skill by name from the first matching skill root. */
 export async function loadSkill(
   cwd: string,
   name: string,
@@ -135,7 +140,7 @@ export async function loadSkill(
   }
 
   for (const root of getSkillRoots(cwd)) {
-    const skillPath = path.join(root.root, normalizedName, 'SKILL.md')
+    const skillPath = path.join(root.root, normalizedName, SKILL_FILENAME)
     try {
       const content = await readFile(skillPath, 'utf8')
       return {
@@ -153,6 +158,7 @@ export async function loadSkill(
   return null
 }
 
+/** Copies a SKILL.md from a source path into the managed skill directory. */
 export async function installSkill(args: {
   cwd: string
   sourcePath: string
@@ -166,14 +172,14 @@ export async function installSkill(args: {
 
   try {
     const entries = await readdir(statPath, { withFileTypes: true })
-    const skillFile = entries.find(entry => entry.isFile() && entry.name === 'SKILL.md')
+    const skillFile = entries.find(entry => entry.isFile() && entry.name === SKILL_FILENAME)
     if (!skillFile) {
-      throw new Error(`No SKILL.md found in ${statPath}`)
+      throw new Error(`No ${SKILL_FILENAME} found in ${statPath}`)
     }
-    content = await readFile(path.join(statPath, 'SKILL.md'), 'utf8')
+    content = await readFile(path.join(statPath, SKILL_FILENAME), 'utf8')
     inferredName = path.basename(statPath)
   } catch (error) {
-    const filePath = statPath.endsWith('SKILL.md') ? statPath : path.join(statPath, 'SKILL.md')
+    const filePath = statPath.endsWith(SKILL_FILENAME) ? statPath : path.join(statPath, SKILL_FILENAME)
     try {
       content = await readFile(filePath, 'utf8')
       inferredName = path.basename(path.dirname(filePath))
@@ -189,7 +195,7 @@ export async function installSkill(args: {
 
   const targetRoot = getManagedSkillRoot(scope, args.cwd)
   const targetDir = path.join(targetRoot, skillName)
-  const targetPath = path.join(targetDir, 'SKILL.md')
+  const targetPath = path.join(targetDir, SKILL_FILENAME)
   await mkdir(targetDir, { recursive: true })
   await writeFile(targetPath, content, 'utf8')
 
@@ -199,6 +205,7 @@ export async function installSkill(args: {
   }
 }
 
+/** Deletes a managed skill directory; returns whether the skill existed. */
 export async function removeManagedSkill(args: {
   cwd: string
   name: string

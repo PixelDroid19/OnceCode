@@ -1,4 +1,6 @@
 import { getErrorCode } from './errors.js'
+import { sleep, shouldRetryStatus } from './http.js'
+import { APP_USER_AGENT } from '../constants.js'
 
 type SearchResult = {
   title: string
@@ -10,18 +12,8 @@ type SearchResult = {
 
 type SearchProvider = 'duckduckgo-lite' | 'sogou'
 
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 OnceCode/0.1'
-const DEFAULT_TIMEOUT_MS = 12000
+const DEFAULT_TIMEOUT_MS = 12_000
 const DEFAULT_MAX_RETRIES = 2
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)))
-}
-
-function isRetryableStatus(status: number): boolean {
-  return status === 429 || (status >= 500 && status < 600)
-}
 
 function isRetryableNetworkError(error: unknown): boolean {
   const code = getErrorCode(error)
@@ -90,7 +82,7 @@ async function fetchWithRetry(
       clearTimeout(timeout)
       lastResponse = response
 
-      if (isRetryableStatus(response.status) && attempt < maxRetries) {
+      if (shouldRetryStatus(response.status) && attempt < maxRetries) {
         await sleep(300 * Math.pow(2, attempt))
         continue
       }
@@ -126,6 +118,7 @@ async function fetchWithRetry(
   )
 }
 
+/** Searches DuckDuckGo Lite (with Sogou fallback) and returns filtered organic results. */
 export async function searchDuckDuckGoLite(options: {
   query: string
   maxResults?: number
@@ -186,6 +179,7 @@ export async function searchDuckDuckGoLite(options: {
   }
 }
 
+/** Fetches a web page, follows HTML redirects, and extracts readable text content. */
 export async function fetchWebPage(options: {
   url: string
   maxChars?: number
@@ -200,7 +194,7 @@ export async function fetchWebPage(options: {
 }> {
   const requestInit: RequestInit = {
     headers: {
-      'user-agent': USER_AGENT,
+      'user-agent': APP_USER_AGENT,
       accept:
         'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7',
       'accept-language': 'en-US,en;q=0.9',
@@ -249,7 +243,7 @@ export async function fetchWebPage(options: {
 
 function fetchSearchPage(provider: SearchProvider, query: string): Promise<Response> {
   const headers: Record<string, string> = {
-    'user-agent': USER_AGENT,
+    'user-agent': APP_USER_AGENT,
     accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   }
 

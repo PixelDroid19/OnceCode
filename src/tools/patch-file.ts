@@ -10,6 +10,7 @@ type Input = {
   replacements: Replacement[]
 }
 
+/** Tool that applies multiple search-and-replace operations to a file atomically. */
 export const patchFileTool: ToolDefinition<Input> = {
   name: 'patch_file',
   description: 'Apply multiple exact-text replacements to one file in a single operation.',

@@ -19,6 +19,7 @@ import type {
   McpServerSummary,
 } from './types.js'
 
+/** Connects to all configured MCP servers and wraps their tools as local ToolDefinitions. */
 export async function createMcpBackedTools(args: {
   cwd: string
   mcpServers: Record<string, McpServerConfig>
