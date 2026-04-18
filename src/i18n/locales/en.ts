@@ -218,6 +218,17 @@ const en = {
   mcp_server_exited: 'MCP server "{{name}}" exited with code {{code}}',
   mcp_server_closed: 'MCP server "{{name}}" closed before completing the request.',
   mcp_server_not_running: 'MCP server "{{name}}" is not running.',
+
+  // ── Context window / compaction ─────────────────────────────────────
+  cmd_context_desc: 'Show context window usage and token statistics.',
+  cmd_compact_desc: 'Compact the conversation to free context space.',
+  context_not_available: 'Context tracking is not available.',
+  context_compact_hint: 'Use /compact in interactive (TTY) mode to compact the conversation.',
+  context_compacting: 'Compacting conversation...',
+  context_auto_compacting: 'Auto-compacting (context limit approaching)...',
+  context_compacted: 'Conversation compacted successfully ({{before}} → {{after}} messages).',
+  context_auto_compacted: 'Context was automatically compacted to stay within the model\'s context window.',
+  context_compact_failed: 'Compaction failed. The conversation may be too short to compact meaningfully.',
 }
 
 export default en

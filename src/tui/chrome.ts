@@ -2,6 +2,7 @@ import type { BackgroundTaskResult } from '../tool.js'
 import path from 'node:path'
 import process from 'node:process'
 import type { RuntimeConfig } from '../config.js'
+import type { ContextWarningLevel } from '../context-tracker.js'
 import type { SlashCommand } from '../cli-commands.js'
 import { APP_NAME } from '../constants.js'
 import { t } from '../i18n/index.js'
@@ -253,6 +254,8 @@ export function renderBanner(
     mcpConnectedCount: number
     mcpConnectingCount: number
     mcpErrorCount: number
+    contextUsagePercent: number
+    contextWarningLevel: ContextWarningLevel
   },
 ): string {
   const panelWidth = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
@@ -268,10 +271,21 @@ export function renderBanner(
     permissionSummary.length > 0
       ? `${DIM}${truncatePlain(permissionSummary.join(' | '), Math.max(24, panelInner))}${RESET}`
       : `${DIM}${t('ui_permissions_info')}${RESET}`
+  const contextColor =
+    session.contextWarningLevel === 'error'
+      ? RED
+      : session.contextWarningLevel === 'warning'
+        ? YELLOW
+        : GREEN
+  const contextBadge =
+    session.contextUsagePercent > 0
+      ? [colorBadge('context', `${session.contextUsagePercent}%`, contextColor)]
+      : []
   const metaBadges = [
     colorBadge('session', 'local', BRIGHT_YELLOW),
     colorBadge('provider', provider, CYAN),
     colorBadge('model', model, GREEN),
+    ...contextBadge,
     colorBadge('messages', String(session.messageCount), BRIGHT_CYAN),
     colorBadge('events', String(session.transcriptCount), BLUE),
     colorBadge('skills', String(session.skillCount), BRIGHT_GREEN),

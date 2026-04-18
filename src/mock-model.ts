@@ -1,5 +1,6 @@
 import type { AgentStep, ChatMessage, ModelAdapter } from './types.js'
 import { t } from './i18n/index.js'
+import { estimateMessagesTokenCount } from './utils/context.js'
 
 function lastUserMessage(messages: ChatMessage[]): string {
   const last = [...messages].reverse().find(message => message.role === 'user')
@@ -24,6 +25,15 @@ function extractLatestAssistantCall(messages: ChatMessage[]): string | undefined
 
 export class MockModelAdapter implements ModelAdapter {
   async next(messages: ChatMessage[]): Promise<AgentStep> {
+    // Generate mock usage based on estimated token count
+    const estimatedInput = estimateMessagesTokenCount(messages)
+    const mockUsage = {
+      inputTokens: estimatedInput,
+      outputTokens: 100,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+    }
+
     const toolMessage = lastToolMessage(messages)
     if (toolMessage?.role === 'tool_result') {
       const lastCall = extractLatestAssistantCall(messages)
@@ -33,6 +43,7 @@ export class MockModelAdapter implements ModelAdapter {
           content: t('mock_directory_contents', {
             content: toolMessage.content,
           }),
+          usage: mockUsage,
         }
       }
 
@@ -42,6 +53,7 @@ export class MockModelAdapter implements ModelAdapter {
           content: t('mock_file_contents', {
             content: toolMessage.content,
           }),
+          usage: mockUsage,
         }
       }
 
@@ -49,6 +61,7 @@ export class MockModelAdapter implements ModelAdapter {
         return {
           type: 'assistant',
           content: toolMessage.content,
+          usage: mockUsage,
         }
       }
 
@@ -57,6 +70,7 @@ export class MockModelAdapter implements ModelAdapter {
         content: t('mock_tool_result', {
           content: toolMessage.content,
         }),
+        usage: mockUsage,
       }
     }
 
@@ -66,6 +80,7 @@ export class MockModelAdapter implements ModelAdapter {
       return {
         type: 'assistant',
         content: t('mock_available_tools'),
+        usage: mockUsage,
       }
     }
 
@@ -78,6 +93,7 @@ export class MockModelAdapter implements ModelAdapter {
           toolName: 'list_files',
           input: dir ? { path: dir } : {},
         }],
+        usage: mockUsage,
       }
     }
 
@@ -94,6 +110,7 @@ export class MockModelAdapter implements ModelAdapter {
             path: searchPath?.trim() || undefined,
           },
         }],
+        usage: mockUsage,
       }
     }
 
@@ -105,6 +122,7 @@ export class MockModelAdapter implements ModelAdapter {
           toolName: 'read_file',
           input: { path: userText.slice('/read '.length).trim() },
         }],
+        usage: mockUsage,
       }
     }
 
@@ -118,6 +136,7 @@ export class MockModelAdapter implements ModelAdapter {
           toolName: 'run_command',
           input: { command, args },
         }],
+        usage: mockUsage,
       }
     }
 
@@ -128,6 +147,7 @@ export class MockModelAdapter implements ModelAdapter {
         return {
           type: 'assistant',
           content: t('tool_write_usage'),
+          usage: mockUsage,
         }
       }
 
@@ -141,6 +161,7 @@ export class MockModelAdapter implements ModelAdapter {
             content: payload.slice(splitAt + 2),
           },
         }],
+        usage: mockUsage,
       }
     }
 
@@ -151,6 +172,7 @@ export class MockModelAdapter implements ModelAdapter {
         return {
           type: 'assistant',
           content: t('tool_edit_usage'),
+          usage: mockUsage,
         }
       }
 
@@ -165,6 +187,7 @@ export class MockModelAdapter implements ModelAdapter {
             replace,
           },
         }],
+        usage: mockUsage,
       }
     }
 
@@ -181,6 +204,7 @@ export class MockModelAdapter implements ModelAdapter {
         '/write notes.txt::hello',
         '/edit notes.txt::hello::hello world',
       ].join('\n'),
+      usage: mockUsage,
     }
   }
 }

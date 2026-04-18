@@ -6,6 +6,7 @@ import {
   loadRuntimeConfig,
   saveOnceCodeSettings,
 } from './config.js'
+import type { ContextTracker } from './context-tracker.js'
 import {
   getCurrentLanguageLabel,
   setLanguage,
@@ -83,6 +84,16 @@ const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
     name: '/language',
     usage: '/language [en-US|es-ES|auto]',
     descriptionKey: 'cmd_language_desc',
+  },
+  {
+    name: '/context',
+    usage: '/context',
+    descriptionKey: 'cmd_context_desc',
+  },
+  {
+    name: '/compact',
+    usage: '/compact',
+    descriptionKey: 'cmd_compact_desc',
   },
   {
     name: '/exit',
@@ -201,6 +212,7 @@ export async function tryHandleLocalCommand(
   input: string,
   context?: {
     tools?: ToolRegistry
+    contextTracker?: ContextTracker
   },
 ): Promise<string | null> {
   if (input === '/' || input === '/help') {
@@ -296,6 +308,20 @@ export async function tryHandleLocalCommand(
 
   if (input === '/language' || input.startsWith('/language ')) {
     return handleLanguageCommand(input)
+  }
+
+  if (input === '/context') {
+    const tracker = context?.contextTracker
+    if (!tracker) {
+      return t('context_not_available')
+    }
+    return tracker.formatSummary()
+  }
+
+  // /compact is handled specially in tty-app.ts (needs model adapter)
+  // Return a hint if reached here (non-TTY mode)
+  if (input === '/compact') {
+    return t('context_compact_hint')
   }
 
   return null

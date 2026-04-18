@@ -1,5 +1,5 @@
 import type { ToolRegistry } from './tool.js'
-import type { ChatMessage, ModelAdapter } from './types.js'
+import type { ChatMessage, ModelAdapter, TokenUsage } from './types.js'
 import type { PermissionManager } from './permissions.js'
 import { t } from './i18n/index.js'
 
@@ -79,6 +79,7 @@ export async function runAgentTurn(args: {
   onToolResult?: (toolName: string, output: string, isError: boolean) => void
   onAssistantMessage?: (content: string) => void
   onProgressMessage?: (content: string) => void
+  onUsageUpdate?: (usage: TokenUsage) => void
 }): Promise<ChatMessage[]> {
   const maxSteps = args.maxSteps
   let messages = args.messages
@@ -99,6 +100,11 @@ export async function runAgentTurn(args: {
 
   for (let step = 0; maxSteps == null || step < maxSteps; step++) {
     const next = await args.model.next(messages)
+
+    // Report usage to the tracker after every API call
+    if (next.usage) {
+      args.onUsageUpdate?.(next.usage)
+    }
 
     if (next.type === 'assistant') {
       const isEmpty = isEmptyAssistantResponse(next.content)

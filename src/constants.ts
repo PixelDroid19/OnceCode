@@ -27,3 +27,29 @@ export const MAX_HISTORY_ENTRIES = 200
 
 /** Maximum number of file entries returned by the list_files tool. */
 export const MAX_LIST_FILES_RESULTS = 200
+
+// ── Context window management ──────────────────────────────────────
+
+/** Default context window size (tokens) for models without a specific rule. */
+export const DEFAULT_CONTEXT_WINDOW = 200_000
+
+/** Token buffer reserved before the context limit; compaction triggers when used tokens reach `contextWindow - maxOutputTokens - COMPACTION_BUFFER_TOKENS`. */
+export const COMPACTION_BUFFER_TOKENS = 20_000
+
+/** Max output tokens allowed for the compaction summary request. */
+export const COMPACT_MAX_OUTPUT_TOKENS = 16_000
+
+/** Number of recent user turns whose tool outputs are protected from micro-compaction. */
+export const MICRO_COMPACT_PROTECT_TURNS = 3
+
+/** Characters-per-token ratio used for rough estimation (matches industry standard). */
+export const CHARS_PER_TOKEN = 4
+
+/** Context usage percentage at which the TUI shows a yellow warning. */
+export const CONTEXT_WARNING_THRESHOLD = 0.6
+
+/** Context usage percentage at which the TUI shows a red warning. */
+export const CONTEXT_ERROR_THRESHOLD = 0.8
+
+/** Placeholder text that replaces cleared tool output during micro-compaction. */
+export const CLEARED_TOOL_OUTPUT = '[Old tool result content cleared]'

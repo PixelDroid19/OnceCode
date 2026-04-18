@@ -1,3 +1,11 @@
+/** Token usage reported by the API for a single request. */
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+}
+
 export type ChatMessage =
   | { role: 'system'; content: string }
   | { role: 'user'; content: string }
@@ -35,6 +43,7 @@ export type AgentStep =
       content: string
       kind?: 'final' | 'progress'
       diagnostics?: StepDiagnostics
+      usage?: TokenUsage
     }
   | {
       type: 'tool_calls'
@@ -42,6 +51,7 @@ export type AgentStep =
       content?: string
       contentKind?: 'progress'
       diagnostics?: StepDiagnostics
+      usage?: TokenUsage
     }
 
 export interface ModelAdapter {

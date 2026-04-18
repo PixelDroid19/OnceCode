@@ -6,8 +6,10 @@ import {
   findMatchingSlashCommands,
   tryHandleLocalCommand,
 } from './cli-commands.js'
+import { compactConversation } from './compaction.js'
 import { loadRuntimeConfig } from './config.js'
 import { readSettingsFile, ONCECODE_SETTINGS_PATH } from './config.js'
+import { ContextTracker } from './context-tracker.js'
 import { initializeI18n, t } from './i18n/index.js'
 import { maybeHandleManagementCommand } from './manage-cli.js'
 import { summarizeMcpServers } from './mcp-status.js'
@@ -70,6 +72,11 @@ async function main(): Promise<void> {
     },
   ]
 
+  const contextTracker = new ContextTracker(
+    runtime?.model ?? 'unknown',
+    runtime?.maxOutputTokens,
+  )
+
   try {
     if (isInteractiveTerminal) {
       await runTtyApp({
@@ -79,6 +86,7 @@ async function main(): Promise<void> {
         messages,
         cwd,
         permissions,
+        contextTracker,
       })
       return
     }
@@ -93,6 +101,8 @@ async function main(): Promise<void> {
         mcpConnectedCount: mcpStatus.connected,
         mcpConnectingCount: mcpStatus.connecting,
         mcpErrorCount: mcpStatus.error,
+        contextUsagePercent: contextTracker.usagePercent,
+        contextWarningLevel: contextTracker.warningLevel,
       }),
     )
     console.log('')
@@ -118,7 +128,10 @@ async function main(): Promise<void> {
           continue
         }
 
-        const localCommandResult = await tryHandleLocalCommand(input, { tools })
+        const localCommandResult = await tryHandleLocalCommand(input, {
+          tools,
+          contextTracker,
+        })
         if (localCommandResult !== null) {
           console.log(`\n${localCommandResult}\n`)
           continue
@@ -146,6 +159,24 @@ async function main(): Promise<void> {
 
       await refreshSystemPrompt({ messages, cwd, permissions, tools })
       messages = [...messages, { role: 'user', content: input }]
+
+      // Auto-compact before sending to model
+      if (contextTracker.shouldCompact()) {
+        try {
+          const compacted = await compactConversation({
+            model,
+            messages,
+          })
+          if (compacted) {
+            messages = compacted
+            contextTracker.resetAfterCompaction()
+            console.log(`\n${t('context_auto_compacted')}\n`)
+          }
+        } catch {
+          // Non-fatal — continue with full context
+        }
+      }
+
       permissions.beginTurn()
       try {
         messages = await runAgentTurn({
@@ -154,6 +185,9 @@ async function main(): Promise<void> {
           messages,
           cwd,
           permissions,
+          onUsageUpdate(usage) {
+            contextTracker.recordUsage(usage)
+          },
         })
       } catch (error) {
         const message =

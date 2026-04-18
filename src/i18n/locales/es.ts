@@ -218,6 +218,17 @@ const es = {
   mcp_server_exited: 'El servidor MCP "{{name}}" terminó con código {{code}}',
   mcp_server_closed: 'El servidor MCP "{{name}}" se cerró antes de completar la solicitud.',
   mcp_server_not_running: 'El servidor MCP "{{name}}" no está en ejecución.',
+
+  // ── Ventana de contexto / compactación ──────────────────────────────
+  cmd_context_desc: 'Mostrar uso de la ventana de contexto y estadísticas de tokens.',
+  cmd_compact_desc: 'Compactar la conversación para liberar espacio de contexto.',
+  context_not_available: 'El seguimiento de contexto no está disponible.',
+  context_compact_hint: 'Usa /compact en modo interactivo (TTY) para compactar la conversación.',
+  context_compacting: 'Compactando conversación...',
+  context_auto_compacting: 'Auto-compactando (acercándose al límite de contexto)...',
+  context_compacted: 'Conversación compactada exitosamente ({{before}} → {{after}} mensajes).',
+  context_auto_compacted: 'El contexto fue compactado automáticamente para mantenerse dentro de la ventana de contexto del modelo.',
+  context_compact_failed: 'La compactación falló. La conversación puede ser demasiado corta para compactar de forma significativa.',
 }
 
 export default es

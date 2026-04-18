@@ -130,6 +130,8 @@ function getSessionStats(args: TtyAppArgs, state: ScreenState) {
     mcpConnectedCount: mcpStatus.connected,
     mcpConnectingCount: mcpStatus.connecting,
     mcpErrorCount: mcpStatus.error,
+    contextUsagePercent: args.contextTracker.usagePercent,
+    contextWarningLevel: args.contextTracker.warningLevel,
   }
 }
 

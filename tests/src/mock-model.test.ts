@@ -17,7 +17,7 @@ describe('mock-model', () => {
         { role: 'assistant_tool_call', toolUseId: '1', toolName: 'read_file', input: {} },
         { role: 'tool_result', toolUseId: '1', toolName: 'read_file', content: 'hello', isError: false },
       ]),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       type: 'assistant',
       content: 'File contents:\n\nhello',
     })

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { z } from 'zod'
+import { ContextTracker } from '../../src/context-tracker.js'
 import { ToolRegistry } from '../../src/tool.js'
 import { runTtyApp } from '../../src/tty-app.js'
 
@@ -54,6 +55,7 @@ describe('tty-app', () => {
         whenReady: vi.fn(async () => {}),
         getSummary: vi.fn(() => ['cwd: test']),
       } as never,
+      contextTracker: new ContextTracker('mock-model'),
     })
 
     await flush()

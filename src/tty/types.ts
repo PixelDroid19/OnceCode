@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from '../config.js'
+import type { ContextTracker } from '../context-tracker.js'
 import type { ToolRegistry } from '../tool.js'
 import type { ChatMessage, ModelAdapter } from '../types.js'
 import type { PermissionManager, PermissionPromptResult, PermissionRequest } from '../permissions.js'
@@ -12,6 +13,7 @@ export type TtyAppArgs = {
   messages: ChatMessage[]
   cwd: string
   permissions: PermissionManager
+  contextTracker: ContextTracker
 }
 
 /** State for a permission prompt currently awaiting user input. */

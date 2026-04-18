@@ -1,5 +1,5 @@
 import type { ToolRegistry } from './tool.js'
-import type { ChatMessage, ModelAdapter, StepDiagnostics, ToolCall } from './types.js'
+import type { ChatMessage, ModelAdapter, StepDiagnostics, TokenUsage, ToolCall } from './types.js'
 import type { RuntimeConfig } from './config.js'
 import { resolveMaxOutputTokens } from './utils/context.js'
 import {
@@ -226,6 +226,12 @@ export class AnthropicModelAdapter implements ModelAdapter {
       stop_reason?: string
       content?: AnthropicContentBlock[]
       error?: { message?: string }
+      usage?: {
+        input_tokens?: number
+        output_tokens?: number
+        cache_creation_input_tokens?: number
+        cache_read_input_tokens?: number
+      }
     }
 
     if (!response.ok) {
@@ -264,6 +270,15 @@ export class AnthropicModelAdapter implements ModelAdapter {
       ignoredBlockTypes: [...ignoredBlockTypes],
     }
 
+    const usage: TokenUsage | undefined = data.usage
+      ? {
+          inputTokens: data.usage.input_tokens ?? 0,
+          outputTokens: data.usage.output_tokens ?? 0,
+          cacheCreationInputTokens: data.usage.cache_creation_input_tokens ?? 0,
+          cacheReadInputTokens: data.usage.cache_read_input_tokens ?? 0,
+        }
+      : undefined
+
     if (toolCalls.length > 0) {
       return {
         type: 'tool_calls' as const,
@@ -274,6 +289,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
             ? ('progress' as const)
             : undefined,
         diagnostics,
+        usage,
       }
     }
 
@@ -282,6 +298,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
       content: parsedText.content,
       kind: parsedText.kind,
       diagnostics,
+      usage,
     }
   }
 }

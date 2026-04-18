@@ -5,6 +5,7 @@ import {
   findMatchingSlashCommands,
   tryHandleLocalCommand,
 } from './cli-commands.js'
+import { compactConversation } from './compaction.js'
 import { loadHistoryEntries, saveHistoryEntries } from './history.js'
 import { parseLocalToolShortcut } from './local-tool-shortcuts.js'
 import { summarizeMcpServers } from './mcp-status.js'
@@ -208,8 +209,47 @@ async function handleInput(
     return false
   }
 
+  // Manual compaction via /compact
+  if (input === '/compact') {
+    state.isBusy = true
+    state.status = t('context_compacting')
+    rerender()
+    try {
+      const compacted = await compactConversation({
+        model: args.model,
+        messages: args.messages,
+        onProgress(status) {
+          state.status = status
+          rerender()
+        },
+      })
+      if (compacted) {
+        args.messages.length = 0
+        args.messages.push(...compacted)
+        args.contextTracker.resetAfterCompaction()
+        pushTranscriptEntry(state, {
+          kind: 'assistant',
+          body: t('context_compacted', {
+            before: String(args.messages.length),
+            after: String(compacted.length),
+          }),
+        })
+      } else {
+        pushTranscriptEntry(state, {
+          kind: 'assistant',
+          body: t('context_compact_failed'),
+        })
+      }
+    } finally {
+      state.isBusy = false
+      state.status = null
+    }
+    return false
+  }
+
   const localCommandResult = await tryHandleLocalCommand(input, {
     tools: args.tools,
+    contextTracker: args.contextTracker,
   })
   if (localCommandResult !== null) {
     pushTranscriptEntry(state, {
@@ -256,6 +296,35 @@ async function handleInput(
   state.isBusy = true
   rerender()
 
+  // ── Auto-compaction check before sending to model ───────────────
+  if (args.contextTracker.shouldCompact()) {
+    state.status = t('context_auto_compacting')
+    rerender()
+    try {
+      const compacted = await compactConversation({
+        model: args.model,
+        messages: args.messages,
+        onProgress(status) {
+          state.status = status
+          rerender()
+        },
+      })
+      if (compacted) {
+        args.messages.length = 0
+        args.messages.push(...compacted)
+        args.contextTracker.resetAfterCompaction()
+        pushTranscriptEntry(state, {
+          kind: 'progress',
+          body: t('context_auto_compacted'),
+        })
+      }
+    } catch {
+      // Auto-compaction failure is non-fatal; continue with full context
+    }
+    state.status = t('ui_thinking')
+    rerender()
+  }
+
   const pendingToolEntries = new Map<string, number[]>()
   const aggregatedEditByKey = new Map<string, AggregatedEditProgress>()
   const aggregatedEditByEntryId = new Map<number, AggregatedEditProgress>()
@@ -268,6 +337,10 @@ async function handleInput(
       messages: args.messages,
       cwd: args.cwd,
       permissions: args.permissions,
+      onUsageUpdate(usage) {
+        args.contextTracker.recordUsage(usage)
+        rerender()
+      },
       onAssistantMessage(content) {
         pushTranscriptEntry(state, {
           kind: 'assistant',

@@ -34,8 +34,6 @@ In other words, OnceCode is a smaller, more controllable terminal coding assista
 - More complex permission modes
 - Feature-flag system
 - Telemetry / analytics
-- Compact / memory / session restore
-
 ## Source layout
 
 ```
@@ -45,6 +43,8 @@ src/
 ├── agent-loop.ts             Multi-turn model -> tool -> model loop
 ├── anthropic-adapter.ts      Anthropic Messages API adapter
 ├── mock-model.ts             Offline fallback adapter
+├── context-tracker.ts        Token usage tracking, overflow detection, display helpers
+├── compaction.ts             Context compaction (micro-compact + full summarisation)
 │
 ├── config.ts                 Runtime and settings type definitions
 ├── config-store.ts           Persistence helpers for ~/.oncecode JSON files
@@ -126,7 +126,7 @@ src/
 │   ├── web.ts                Web fetching and search (DuckDuckGo, Sogou)
 │   ├── command-line.ts       Shell command-line tokenizer
 │   ├── errors.ts             Error code extraction utilities
-│   └── context.ts            Shared context types
+│   └── context.ts            Context window sizing, token estimation, overflow detection
 │
 └── types.ts                  Global shared type definitions
 ```
@@ -139,6 +139,35 @@ src/
 - **Tool contract**: Every tool implements `ToolDefinition<T>` with a Zod schema and an `inputSchema` for the model.
 - **Permission flow**: Tools that modify the filesystem go through `applyReviewedFileChange` which shows a diff for user approval.
 - **MCP transport abstraction**: Both stdio and HTTP clients implement `McpClientLike` so the registry treats them uniformly.
+
+## Context window management
+
+OnceCode tracks token usage reported by the provider and automatically compacts the conversation when the context window fills up. The design was informed by studying Claude Code, ForgeCode, Qwen-Code, and OpenCode.
+
+### Token accounting
+
+- The Anthropic adapter extracts the `usage` object from every API response (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`).
+- `ContextTracker` records each response's usage and exposes `usageFraction`, `usagePercent`, `warningLevel`, and `shouldCompact()`.
+- `lastInputTokens` (input + cache_creation + cache_read) serves as the primary proxy for current context size because it reflects exactly what the provider computed.
+
+### Context window sizing
+
+- `utils/context.ts` contains a static table of 21 regex rules mapping model IDs to context window sizes (e.g. Claude = 200K, GPT-5 = 128K, Gemini 2.5 = 1M).
+- `getContextWindowSize(model)` returns the limit; `getEffectiveContextBudget()` subtracts `maxOutputTokens` and a 20K compaction buffer to determine the usable budget.
+
+### Compaction
+
+Two-phase compaction in `compaction.ts`:
+
+1. **Micro-compact**: Clears old tool_result outputs (>200 chars, outside the last 3 user turns) with a placeholder. This is fast, local, and does not call the model.
+2. **Full compaction**: Sends the entire conversation to the model with a structured summarisation prompt. The result replaces all old messages with: retained system messages + summary + assistant acknowledgement + the last user message.
+
+Auto-compaction runs before each agent turn when `contextTracker.shouldCompact()` returns true. Users can also trigger `/compact` manually.
+
+### TUI integration
+
+- The banner displays a `[context XX%]` badge with colour coding: green (<60%), yellow (60-80%), red (>80%).
+- `/context` prints detailed tracker stats; `/compact` triggers manual compaction.
 
 ## Why it is good for learning
 
@@ -159,5 +188,5 @@ That makes it well suited to:
 1. A more complete virtual-scrolling transcript
 2. Richer input editing behavior
 3. A finer-grained tool execution status panel
-4. Session history and project memory
+4. Session history persistence and project memory
 5. Stronger UI componentization
