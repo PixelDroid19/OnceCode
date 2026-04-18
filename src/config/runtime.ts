@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import {
-  LEGACY_CLAUDE_SETTINGS_PATH,
   ONCECODE_DIR,
   ONCECODE_HISTORY_PATH,
   ONCECODE_MCP_PATH,
@@ -55,7 +54,6 @@ export type RuntimeConfig = {
 export type McpConfigScope = 'user' | 'project'
 
 export {
-  LEGACY_CLAUDE_SETTINGS_PATH,
   ONCECODE_DIR,
   ONCECODE_HISTORY_PATH,
   ONCECODE_MCP_PATH,
@@ -106,18 +104,17 @@ function mergeSettings(
   }
 }
 
-/** Merges all config sources (legacy Claude compat settings, global MCP, project MCP, oncecode settings). */
+/** Merges all config sources (global MCP, project MCP, oncecode settings). */
 export async function loadEffectiveSettings(): Promise<OnceCodeSettings> {
-  const [legacyClaudeSettings, globalMcpConfig, projectMcpConfig, onceCodeSettings] =
+  const [globalMcpConfig, projectMcpConfig, onceCodeSettings] =
     await Promise.all([
-      readSettingsFile(LEGACY_CLAUDE_SETTINGS_PATH),
       readMcpConfigFile(ONCECODE_MCP_PATH),
       readMcpConfigFile(PROJECT_MCP_PATH),
       readSettingsFile(ONCECODE_SETTINGS_PATH),
     ])
   return mergeSettings(
     mergeSettings(
-      mergeSettings(legacyClaudeSettings, { mcpServers: globalMcpConfig }),
+      { mcpServers: globalMcpConfig },
       { mcpServers: projectMcpConfig },
     ),
     onceCodeSettings,
@@ -187,6 +184,6 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     apiKey,
     maxOutputTokens,
     mcpServers: effectiveSettings.mcpServers ?? {},
-    sourceSummary: `config: ${ONCECODE_SETTINGS_PATH} > ${LEGACY_CLAUDE_SETTINGS_PATH} > process.env`,
+    sourceSummary: `config: ${ONCECODE_SETTINGS_PATH} > process.env`,
   }
 }

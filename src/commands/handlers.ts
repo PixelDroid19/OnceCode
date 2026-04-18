@@ -1,5 +1,4 @@
 import {
-  LEGACY_CLAUDE_SETTINGS_PATH,
   ONCECODE_MCP_PATH,
   ONCECODE_PERMISSIONS_PATH,
   ONCECODE_SETTINGS_PATH,
@@ -224,7 +223,6 @@ export async function tryHandleLocalCommand(
       t('config_settings_path', { path: ONCECODE_SETTINGS_PATH }),
       t('config_permissions_path', { path: ONCECODE_PERMISSIONS_PATH }),
       t('config_mcp_path', { path: ONCECODE_MCP_PATH }),
-      t('config_compat_path', { path: LEGACY_CLAUDE_SETTINGS_PATH }),
     ].join('\n')
   }
 
@@ -237,7 +235,7 @@ export async function tryHandleLocalCommand(
     if (skills.length === 0) {
       return t('skill_none_with_hint', {
         locations:
-          '~/.oncecode/skills/<name>/SKILL.md, .oncecode/skills/<name>/SKILL.md, .claude/skills/<name>/SKILL.md, or ~/.claude/skills/<name>/SKILL.md',
+          '~/.oncecode/skills/<name>/SKILL.md or .oncecode/skills/<name>/SKILL.md',
       })
     }
 

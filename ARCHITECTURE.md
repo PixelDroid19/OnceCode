@@ -150,7 +150,7 @@ src/
 
 ## Context window management
 
-OnceCode tracks token usage reported by the provider and automatically compacts the conversation when the context window fills up. The design was informed by studying Claude Code, ForgeCode, Qwen-Code, and OpenCode.
+OnceCode tracks token usage reported by the provider and automatically compacts the conversation when the context window fills up. The design was informed by studying ForgeCode, Qwen-Code, and OpenCode.
 
 ### Token accounting
 
@@ -160,7 +160,7 @@ OnceCode tracks token usage reported by the provider and automatically compacts 
 
 ### Context window sizing
 
-- `context/window.ts` contains a static table of 21 regex rules mapping model IDs to context window sizes (e.g. Claude = 200K, GPT-5 = 128K, Gemini 2.5 = 1M).
+- `context/window.ts` contains a static table of 21 regex rules mapping model IDs to context window sizes (e.g. Anthropic = 200K, GPT-5 = 128K, Gemini 2.5 = 1M).
 - `getContextWindowSize(model)` returns the limit; `getEffectiveContextBudget()` subtracts `maxOutputTokens` and a 20K compaction buffer to determine the usable budget.
 
 ### Compaction

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { makeTempDir, removeTempDir } from '../helpers/fs.js'
 import { runTsxEntry } from '../helpers/cli.js'
@@ -17,7 +17,6 @@ describe('install entrypoint', () => {
   it('writes settings and installs a launcher through the real installer flow', async () => {
     const cwd = process.cwd()
     homeDir = await makeTempDir('oncecode-install-home')
-    await mkdir(path.join(homeDir, '.claude'), { recursive: true })
 
     const result = await runTsxEntry({
       cwd,

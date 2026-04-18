@@ -92,7 +92,7 @@ A lightweight built-in task tracker would improve long multi-step execution.
 
 This should stay simple and should not become a heavyweight planning subsystem.
 
-### 8. `.claude/agents` and sub-agent support
+### 8. `.oncecode/agents` and sub-agent support
 
 This is an important capability, but it also adds complexity.
 

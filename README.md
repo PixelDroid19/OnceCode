@@ -278,8 +278,6 @@ Skills are discovered from:
 
 - `./.oncecode/skills/<skill-name>/SKILL.md`
 - `~/.oncecode/skills/<skill-name>/SKILL.md`
-- `./.claude/skills/<skill-name>/SKILL.md`
-- `~/.claude/skills/<skill-name>/SKILL.md`
 
 Configuration priority:
 

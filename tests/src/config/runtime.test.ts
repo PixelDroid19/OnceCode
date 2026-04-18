@@ -31,17 +31,11 @@ describe('config', () => {
     setEnv({ HOME: homeDir, ANTHROPIC_AUTH_TOKEN: 'env-token' })
     process.chdir(cwdDir)
 
-    const legacyClaudeDir = path.join(homeDir, '.claude')
     const oncecodeDir = path.join(homeDir, '.oncecode')
-    await mkdir(legacyClaudeDir, { recursive: true })
     await mkdir(oncecodeDir, { recursive: true })
     await writeFile(
-      path.join(legacyClaudeDir, 'settings.json'),
-      JSON.stringify({ model: 'claude-base', env: { ANTHROPIC_BASE_URL: 'https://claude.example' } }),
-    )
-    await writeFile(
       path.join(oncecodeDir, 'settings.json'),
-      JSON.stringify({ model: 'once-model', maxOutputTokens: 2048 }),
+      JSON.stringify({ model: 'once-model', maxOutputTokens: 2048, env: { ANTHROPIC_BASE_URL: 'https://api.example.com' } }),
     )
     await writeFile(
       path.join(oncecodeDir, 'mcp.json'),
@@ -58,7 +52,7 @@ describe('config', () => {
     const runtime = await config.loadRuntimeConfig()
 
     expect(runtime.model).toBe('once-model')
-    expect(runtime.baseUrl).toBe('https://claude.example')
+    expect(runtime.baseUrl).toBe('https://api.example.com')
     expect(runtime.authToken).toBe('env-token')
     expect(runtime.maxOutputTokens).toBe(2048)
     expect(Object.keys(runtime.mcpServers).sort()).toEqual(['globalFs', 'projectFs'])

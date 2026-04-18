@@ -15,7 +15,7 @@ import { CLEARED_TOOL_OUTPUT } from '@/constants.js'
 // ── Context window size rules ──────────────────────────────────────
 
 describe('getContextWindowSize', () => {
-  it('returns 200K for Claude models', () => {
+  it('returns 200K for Anthropic models', () => {
     expect(getContextWindowSize('claude-sonnet-4')).toBe(200_000)
     expect(getContextWindowSize('claude-opus-4-6')).toBe(200_000)
     expect(getContextWindowSize('claude-3-5-sonnet-20241022')).toBe(200_000)

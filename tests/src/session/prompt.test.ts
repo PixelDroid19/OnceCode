@@ -20,13 +20,13 @@ describe('prompt', () => {
     }
   })
 
-  it('builds a system prompt with permissions, skills, mcp and CLAUDE.md compat files', async () => {
+  it('builds a system prompt with permissions, skills, mcp and ONCECODE.md files', async () => {
     homeDir = await makeTempDir('oncecode-home')
     cwdDir = await makeTempDir('oncecode-project')
     setEnv({ HOME: homeDir })
-    await mkdir(path.join(homeDir, '.claude'), { recursive: true })
-    await writeFile(path.join(homeDir, '.claude', 'CLAUDE.md'), 'Global instructions')
-    await writeFile(path.join(cwdDir, 'CLAUDE.md'), 'Project instructions')
+    await mkdir(path.join(homeDir, '.oncecode'), { recursive: true })
+    await writeFile(path.join(homeDir, '.oncecode', 'ONCECODE.md'), 'Global instructions')
+    await writeFile(path.join(cwdDir, 'ONCECODE.md'), 'Project instructions')
 
     const { buildSystemPrompt } = await importFresh<typeof import('@/session/prompt.js')>(
       '@/session/prompt.js', import.meta.url,

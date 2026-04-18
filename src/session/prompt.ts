@@ -4,7 +4,7 @@ import type { McpServerSummary } from '@/mcp/types.js'
 import type { SkillSummary } from './skills.js'
 import { readTextFileOrNull } from '@/utils/fs.js'
 
-/** Assembles the full system prompt from base instructions, user/project CLAUDE.md (compat) files, and runtime context. */
+/** Assembles the full system prompt from base instructions, user/project ONCECODE.md files, and runtime context. */
 export async function buildSystemPrompt(
   cwd: string,
   permissionSummary: string[] = [],
@@ -13,8 +13,8 @@ export async function buildSystemPrompt(
     mcpServers?: McpServerSummary[]
   },
 ): Promise<string> {
-  const globalLegacyMd = await readTextFileOrNull(path.join(os.homedir(), '.claude', 'CLAUDE.md'))
-  const projectLegacyMd = await readTextFileOrNull(path.join(cwd, 'CLAUDE.md'))
+  const globalInstructionsMd = await readTextFileOrNull(path.join(os.homedir(), '.oncecode', 'ONCECODE.md'))
+  const projectInstructionsMd = await readTextFileOrNull(path.join(cwd, 'ONCECODE.md'))
 
   const parts = [
     'You are OnceCode, a terminal coding assistant.',
@@ -95,12 +95,12 @@ export async function buildSystemPrompt(
     }
   }
 
-  if (globalLegacyMd) {
-    parts.push(`Global instructions from ~/.claude/CLAUDE.md:\n${globalLegacyMd}`)
+  if (globalInstructionsMd) {
+    parts.push(`Global instructions from ~/.oncecode/ONCECODE.md:\n${globalInstructionsMd}`)
   }
 
-  if (projectLegacyMd) {
-    parts.push(`Project instructions from ${path.join(cwd, 'CLAUDE.md')}:\n${projectLegacyMd}`)
+  if (projectInstructionsMd) {
+    parts.push(`Project instructions from ${path.join(cwd, 'ONCECODE.md')}:\n${projectInstructionsMd}`)
   }
 
   return parts.join('\n\n')

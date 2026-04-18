@@ -138,7 +138,7 @@ type ContextWindowRule = {
  * Rules are matched first-match in order, so more specific patterns come first.
  */
 const CONTEXT_WINDOW_RULES: ContextWindowRule[] = [
-  // Claude family — all 200K
+  // Anthropic family — all 200K
   { patterns: ['claude-opus-4-6', 'opus-4-6'], contextWindow: 200_000 },
   { patterns: ['claude-sonnet-4-6', 'sonnet-4-6'], contextWindow: 200_000 },
   { patterns: ['claude-haiku-4-5', 'haiku-4-5'], contextWindow: 200_000 },

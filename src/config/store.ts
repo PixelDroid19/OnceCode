@@ -16,8 +16,6 @@ export const ONCECODE_PERMISSIONS_PATH = path.join(ONCECODE_DIR, 'permissions.js
 export const ONCECODE_MCP_PATH = path.join(ONCECODE_DIR, 'mcp.json')
 /** Path to the stored OAuth/bearer tokens for MCP servers. */
 export const ONCECODE_MCP_TOKENS_PATH = path.join(ONCECODE_DIR, 'mcp-tokens.json')
-/** Path to the legacy Claude Code settings file, used as a low-priority compat source. */
-export const LEGACY_CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json')
 /** Path to the project-local MCP server configuration file. */
 export const PROJECT_MCP_PATH = path.join(process.cwd(), '.mcp.json')
 

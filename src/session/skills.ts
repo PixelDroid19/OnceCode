@@ -1,5 +1,4 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { SKILL_FILENAME } from '@/constants.js'
 import { ONCECODE_DIR } from '@/config/store.js'
@@ -11,7 +10,7 @@ export type SkillSummary = {
   name: string
   description: string
   path: string
-  source: 'project' | 'user' | 'compat_project' | 'compat_user'
+  source: 'project' | 'user'
 }
 
 /** A skill summary along with the raw markdown content of the SKILL.md file. */
@@ -60,14 +59,6 @@ function getSkillRoots(cwd: string): SkillSourceRoot[] {
     {
       root: path.join(ONCECODE_DIR, 'skills'),
       source: 'user',
-    },
-    {
-      root: path.join(cwd, '.claude', 'skills'),
-      source: 'compat_project',
-    },
-    {
-      root: path.join(os.homedir(), '.claude', 'skills'),
-      source: 'compat_user',
     },
   ]
 }

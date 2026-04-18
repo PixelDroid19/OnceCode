@@ -49,7 +49,7 @@ describe('skills', () => {
     homeDir = await makeTempDir('oncecode-home')
     cwdDir = await makeTempDir('oncecode-project')
     setEnv({ HOME: homeDir })
-    const skillDir = path.join(cwdDir, '.claude', 'skills', 'backend')
+    const skillDir = path.join(cwdDir, '.oncecode', 'skills', 'backend')
     await mkdir(skillDir, { recursive: true })
     await writeFile(path.join(skillDir, 'SKILL.md'), '# Backend\n\nBuild APIs')
 
@@ -58,7 +58,7 @@ describe('skills', () => {
     )
     await expect(skills.loadSkill(cwdDir, 'backend')).resolves.toMatchObject({
       name: 'backend',
-      source: 'compat_project',
+      source: 'project',
       description: 'Build APIs',
     })
   })
