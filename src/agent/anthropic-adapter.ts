@@ -1,5 +1,5 @@
 import type { ToolRegistry } from '@/tools/framework.js'
-import type { ChatMessage, ModelAdapter, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
+import type { ChatMessage, ModelAdapter, ModelRequestOptions, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
 import {
@@ -168,11 +168,11 @@ export class AnthropicModelAdapter implements ModelAdapter {
     private readonly getRuntimeConfig: () => Promise<RuntimeConfig>,
   ) {}
 
-  async next(messages: ChatMessage[]) {
+  async next(messages: ChatMessage[], options?: ModelRequestOptions) {
     const runtime = await this.getRuntimeConfig()
     const payload = toAnthropicMessages(messages)
     const url = `${runtime.baseUrl.replace(/\/$/, '')}/v1/messages`
-    const maxOutputTokens = resolveMaxOutputTokens(
+    const maxOutputTokens = options?.maxOutputTokens ?? resolveMaxOutputTokens(
       runtime.model,
       runtime.maxOutputTokens,
     )
@@ -188,16 +188,20 @@ export class AnthropicModelAdapter implements ModelAdapter {
       headers['x-api-key'] = runtime.apiKey
     }
 
-    const requestBody = {
+    const includeTools = options?.includeTools !== false
+    const requestBody: Record<string, unknown> = {
       model: runtime.model,
       system: payload.system,
       messages: payload.messages,
-      tools: this.tools.list().map(tool => ({
+      max_tokens: maxOutputTokens,
+    }
+
+    if (includeTools) {
+      requestBody.tools = this.tools.list().map(tool => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
-      })),
-      max_tokens: maxOutputTokens,
+      }))
     }
 
     const maxRetries = getRetryLimit()

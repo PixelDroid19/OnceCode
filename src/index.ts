@@ -161,19 +161,22 @@ async function main(): Promise<void> {
       messages = [...messages, { role: 'user', content: input }]
 
       // Auto-compact before sending to model
-      if (contextTracker.shouldCompact()) {
+      if (contextTracker.shouldCompact() && contextTracker.canAutoCompact()) {
         try {
-          const compacted = await compactConversation({
+          const result = await compactConversation({
             model,
             messages,
           })
-          if (compacted) {
-            messages = compacted
+          if (result) {
+            messages = result.messages
             contextTracker.resetAfterCompaction()
             console.log(`\n${t('context_auto_compacted')}\n`)
+          } else {
+            contextTracker.recordCompactFailure()
           }
         } catch {
-          // Non-fatal — continue with full context
+          // Non-fatal — record for circuit breaker
+          contextTracker.recordCompactFailure()
         }
       }
 

@@ -2,6 +2,7 @@ import type { TokenUsage } from '@/types.js'
 import {
   CONTEXT_ERROR_THRESHOLD,
   CONTEXT_WARNING_THRESHOLD,
+  MAX_CONSECUTIVE_COMPACT_FAILURES,
 } from '@/constants.js'
 import {
   getContextUsageFraction,
@@ -50,6 +51,7 @@ export class ContextTracker {
   #totalCacheCreation = 0
   #totalCacheRead = 0
   #requestCount = 0
+  #consecutiveCompactFailures = 0
 
   constructor(model: string, configuredMaxOutputTokens?: number) {
     this.#model = model
@@ -74,8 +76,32 @@ export class ContextTracker {
   /** Resets accumulated totals after compaction. Keeps the model reference. */
   resetAfterCompaction(): void {
     this.#lastInputTokens = 0
+    this.#consecutiveCompactFailures = 0
     // Keep cumulative totals — they represent session-lifetime usage.
     // Only reset the "last" pointer so the next API call updates it.
+  }
+
+  /** Records a compaction failure for the circuit breaker. */
+  recordCompactFailure(): void {
+    this.#consecutiveCompactFailures += 1
+  }
+
+  /** Resets the compaction failure counter (call after a successful compaction). */
+  resetCompactFailures(): void {
+    this.#consecutiveCompactFailures = 0
+  }
+
+  /**
+   * Whether auto-compaction is allowed based on the circuit breaker.
+   * Returns `false` after `MAX_CONSECUTIVE_COMPACT_FAILURES` consecutive failures.
+   */
+  canAutoCompact(): boolean {
+    return this.#consecutiveCompactFailures < MAX_CONSECUTIVE_COMPACT_FAILURES
+  }
+
+  /** Current number of consecutive compaction failures. */
+  get consecutiveCompactFailures(): number {
+    return this.#consecutiveCompactFailures
   }
 
   /** Whether the context is overflowing and compaction should trigger. */

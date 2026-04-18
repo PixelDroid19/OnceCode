@@ -1,6 +1,8 @@
 import type { ChatMessage, ModelAdapter } from '@/types.js'
 import {
   CLEARED_TOOL_OUTPUT,
+  COMPACT_MAX_OUTPUT_TOKENS,
+  COMPACT_SUMMARIZE_RATIO,
   MICRO_COMPACT_PROTECT_TURNS,
 } from '@/constants.js'
 import { estimateTokenCount } from './window.js'
@@ -63,9 +65,19 @@ export function microCompact(
 
 // ── Full compaction (summarization) ─────────────────────────────────
 
-const COMPACTION_SYSTEM_PROMPT = `You are a conversation summarizer. Your task is to create a concise but thorough summary of the conversation so far, preserving all essential context needed to continue the work seamlessly.
+const COMPACTION_SYSTEM_PROMPT = `You are a conversation summarizer for a coding assistant session. Your task is to create a concise but thorough summary of the conversation so far, preserving all essential context needed to continue the work seamlessly.
 
-Produce a summary with these sections:
+First, analyze the conversation inside an <analysis> scratchpad (this will be stripped from the final output):
+
+<analysis>
+- What is the user's primary goal?
+- What constraints and instructions did the user give?
+- What key technical discoveries were made?
+- What files were modified and how?
+- What is currently in progress or pending?
+</analysis>
+
+Then produce a structured summary with these sections:
 
 ## Goal
 The user's primary request and intent.
@@ -93,27 +105,105 @@ RULES:
 - Do NOT include conversational filler or meta-commentary about the summary itself.
 - Write in a direct, factual style.`
 
+/** Result metadata returned by `compactConversation`. */
+export interface CompactionResult {
+  messages: ChatMessage[]
+  beforeCount: number
+  afterCount: number
+  freedTokens: number
+}
+
+/**
+ * Finds the split point for compaction: the position of a user message
+ * boundary at approximately `ratio` through the conversation (by character
+ * count). Only the older portion (before the split) is sent for summarization;
+ * the recent portion is kept verbatim.
+ *
+ * Returns the index of the first message in the "recent" portion,
+ * or `messages.length` if no suitable split point is found.
+ */
+function findSplitPoint(
+  messages: ChatMessage[],
+  ratio: number,
+): number {
+  // Calculate total character count across all messages
+  let totalChars = 0
+  for (const msg of messages) {
+    totalChars += 'content' in msg && typeof msg.content === 'string'
+      ? msg.content.length
+      : 0
+  }
+
+  const targetChars = totalChars * ratio
+  let cumulativeChars = 0
+
+  // Walk forward to find the point where we've accumulated ~ratio of total chars
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]!
+    cumulativeChars += 'content' in msg && typeof msg.content === 'string'
+      ? msg.content.length
+      : 0
+
+    // Only split on user message boundaries (after accumulating enough chars)
+    if (cumulativeChars >= targetChars && msg.role === 'user') {
+      // Split AFTER this user message — include it in the old portion
+      return i + 1
+    }
+  }
+
+  // If no good split found, fall back to the nearest user message after target
+  cumulativeChars = 0
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]!
+    cumulativeChars += 'content' in msg && typeof msg.content === 'string'
+      ? msg.content.length
+      : 0
+    if (cumulativeChars >= targetChars) {
+      // Find the next user message boundary
+      for (let j = i; j < messages.length; j++) {
+        if (messages[j]!.role === 'user') {
+          return j + 1
+        }
+      }
+      break
+    }
+  }
+
+  // No suitable split — summarize everything
+  return messages.length
+}
+
+/**
+ * Strips the `<analysis>...</analysis>` scratchpad block from a summary,
+ * since it's only meant as a thinking aid for the summarizer model.
+ */
+function stripAnalysisScratchpad(summary: string): string {
+  return summary.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '').trim()
+}
+
 /**
  * Compacts a conversation by sending it to the model for summarization.
  *
  * 1. Runs micro-compaction first to reduce bulk.
  * 2. Strips system messages from the conversation (they'll be re-injected on next turn).
- * 3. Sends the entire remaining conversation + summary prompt to the model.
- * 4. Replaces old messages with: `[system-prompt]`, `[summary-as-user]`, `[ack-as-assistant]`,
- *    plus the most recent user message (if any) so the model knows what to continue.
+ * 3. Finds a split point at ~70% of conversation chars on a user message boundary.
+ * 4. Sends only the older portion + summary prompt to the model (no tools, capped output).
+ * 5. Builds compacted messages: `[system]`, `[summary-as-user]`, `[ack-as-assistant]`,
+ *    plus the recent portion verbatim.
  *
- * Returns the compacted messages array, or null if compaction fails.
+ * Returns a `CompactionResult` with metadata, or `null` if compaction fails.
  */
 export async function compactConversation(args: {
   model: ModelAdapter
   messages: ChatMessage[]
   onProgress?: (status: string) => void
-}): Promise<ChatMessage[] | null> {
+}): Promise<CompactionResult | null> {
   const { model, messages, onProgress } = args
+  const beforeCount = messages.length
 
   // Step 1: micro-compact
   onProgress?.('micro-compacting old tool outputs...')
-  const { messages: pruned } = microCompact(messages)
+  const { messages: pruned, freedTokens: microFreed } = microCompact(messages)
 
   // Step 2: Extract system messages (will be re-injected by the caller)
   const systemMessages = pruned.filter(m => m.role === 'system')
@@ -124,32 +214,50 @@ export async function compactConversation(args: {
     return null
   }
 
-  // Step 3: Build the conversation text for the summarizer
+  // Step 3: Find split point — summarize ~70%, keep ~30% recent
+  const splitIndex = findSplitPoint(conversationMessages, COMPACT_SUMMARIZE_RATIO)
+  const olderMessages = conversationMessages.slice(0, splitIndex)
+  const recentMessages = conversationMessages.slice(splitIndex)
+
+  // If the older portion is too small, summarize everything
+  const messagesToSummarize = olderMessages.length >= 4
+    ? olderMessages
+    : conversationMessages
+
+  const keepRecent = olderMessages.length >= 4
+    ? recentMessages
+    : []
+
+  // Step 4: Build the summarization request (no tools, capped output)
   onProgress?.('generating conversation summary...')
   const summaryRequest: ChatMessage[] = [
     { role: 'system', content: COMPACTION_SYSTEM_PROMPT },
-    ...conversationMessages,
+    ...messagesToSummarize,
     {
       role: 'user',
       content:
-        'Now create a structured summary of the entire conversation above. Follow the format specified in the system prompt exactly.',
+        'Now create a structured summary of the entire conversation above. Follow the format specified in the system prompt exactly. Begin with the <analysis> scratchpad, then produce the structured summary.',
     },
   ]
 
   try {
-    const step = await model.next(summaryRequest)
+    const step = await model.next(summaryRequest, {
+      maxOutputTokens: COMPACT_MAX_OUTPUT_TOKENS,
+      includeTools: false,
+    })
 
     if (step.type !== 'assistant' || !step.content.trim()) {
       onProgress?.('compaction failed: model returned empty or non-text response')
       return null
     }
 
-    const summary = step.content.trim()
+    // Strip <analysis> scratchpad from the summary
+    const summary = stripAnalysisScratchpad(step.content)
 
-    // Step 4: Find the most recent user message to preserve continuity
-    const lastUserMsg = [...conversationMessages]
-      .reverse()
-      .find(m => m.role === 'user')
+    if (!summary) {
+      onProgress?.('compaction failed: summary was empty after stripping analysis')
+      return null
+    }
 
     // Step 5: Build compacted messages
     const compacted: ChatMessage[] = [
@@ -172,22 +280,20 @@ export async function compactConversation(args: {
         content:
           'I understand the context from the summary. I\'ll continue from where we left off without repeating completed work.',
       },
+      // Append the recent (un-summarized) messages verbatim
+      ...keepRecent,
     ]
 
-    // If there's a recent user message that differs from the summary prompt,
-    // re-inject it so the model knows the current task
-    if (
-      lastUserMsg &&
-      !lastUserMsg.content.includes('create a structured summary')
-    ) {
-      compacted.push({
-        role: 'user',
-        content: lastUserMsg.content,
-      })
-    }
+    const afterCount = compacted.length
+    const estimatedSummaryTokens = estimateTokenCount(summary)
+    const estimatedOldTokens = messagesToSummarize.reduce(
+      (sum, m) => sum + ('content' in m && typeof m.content === 'string' ? estimateTokenCount(m.content) : 0),
+      0,
+    )
+    const freedTokens = microFreed + Math.max(0, estimatedOldTokens - estimatedSummaryTokens)
 
     onProgress?.('compaction complete')
-    return compacted
+    return { messages: compacted, beforeCount, afterCount, freedTokens }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     onProgress?.(`compaction failed: ${msg}`)

@@ -1,4 +1,4 @@
-import type { AgentStep, ChatMessage, ModelAdapter } from '@/types.js'
+import type { AgentStep, ChatMessage, ModelAdapter, ModelRequestOptions } from '@/types.js'
 import { t } from '@/i18n/index.js'
 import { estimateMessagesTokenCount } from '@/context/window.js'
 
@@ -24,7 +24,7 @@ function extractLatestAssistantCall(messages: ChatMessage[]): string | undefined
 }
 
 export class MockModelAdapter implements ModelAdapter {
-  async next(messages: ChatMessage[]): Promise<AgentStep> {
+  async next(messages: ChatMessage[], _options?: ModelRequestOptions): Promise<AgentStep> {
     // Generate mock usage based on estimated token count
     const estimatedInput = estimateMessagesTokenCount(messages)
     const mockUsage = {

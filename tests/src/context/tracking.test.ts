@@ -9,7 +9,7 @@ import {
 } from '@/context/window.js'
 import { ContextTracker, formatTokenCount } from '@/context/tracker.js'
 import type { ChatMessage, TokenUsage } from '@/types.js'
-import { microCompact } from '@/context/compaction.js'
+import { microCompact, compactConversation } from '@/context/compaction.js'
 import { CLEARED_TOOL_OUTPUT } from '@/constants.js'
 
 // ── Context window size rules ──────────────────────────────────────
@@ -323,5 +323,173 @@ describe('microCompact', () => {
     const original3 = messages[3]!
     microCompact(messages, 3)
     expect(messages[3]).toBe(original3) // original untouched
+  })
+})
+
+// ── Circuit breaker ─────────────────────────────────────────────────
+
+describe('ContextTracker circuit breaker', () => {
+  it('allows auto-compact by default', () => {
+    const tracker = new ContextTracker('claude-sonnet-4')
+    expect(tracker.canAutoCompact()).toBe(true)
+    expect(tracker.consecutiveCompactFailures).toBe(0)
+  })
+
+  it('disables auto-compact after 3 consecutive failures', () => {
+    const tracker = new ContextTracker('claude-sonnet-4')
+    tracker.recordCompactFailure()
+    expect(tracker.canAutoCompact()).toBe(true)
+    tracker.recordCompactFailure()
+    expect(tracker.canAutoCompact()).toBe(true)
+    tracker.recordCompactFailure()
+    expect(tracker.canAutoCompact()).toBe(false)
+    expect(tracker.consecutiveCompactFailures).toBe(3)
+  })
+
+  it('resets failures on successful compaction', () => {
+    const tracker = new ContextTracker('claude-sonnet-4')
+    tracker.recordCompactFailure()
+    tracker.recordCompactFailure()
+    tracker.resetCompactFailures()
+    expect(tracker.canAutoCompact()).toBe(true)
+    expect(tracker.consecutiveCompactFailures).toBe(0)
+  })
+
+  it('resets failures via resetAfterCompaction()', () => {
+    const tracker = new ContextTracker('claude-sonnet-4')
+    tracker.recordCompactFailure()
+    tracker.recordCompactFailure()
+    tracker.resetAfterCompaction()
+    expect(tracker.canAutoCompact()).toBe(true)
+  })
+})
+
+// ── compactConversation ─────────────────────────────────────────────
+
+describe('compactConversation', () => {
+  it('returns null for conversations with fewer than 4 non-system messages', async () => {
+    const mockModel = {
+      async next() {
+        return { type: 'assistant' as const, content: 'summary' }
+      },
+    }
+    const result = await compactConversation({
+      model: mockModel,
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'hi' },
+      ],
+    })
+    expect(result).toBeNull()
+  })
+
+  it('compacts a conversation and returns CompactionResult with correct counts', async () => {
+    const mockModel = {
+      async next() {
+        return { type: 'assistant' as const, content: 'Summary of conversation.' }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'system prompt' },
+      { role: 'user', content: 'Do task A' },
+      { role: 'assistant', content: 'Done with task A.' },
+      { role: 'user', content: 'Do task B' },
+      { role: 'assistant', content: 'Done with task B.' },
+      { role: 'user', content: 'Do task C' },
+      { role: 'assistant', content: 'Done with task C.' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    expect(result!.beforeCount).toBe(7)
+    expect(result!.afterCount).toBeGreaterThanOrEqual(3) // system + summary-user + ack-assistant + possible recent
+    expect(result!.freedTokens).toBeGreaterThanOrEqual(0)
+    // Summary should be present in the first user message after system
+    const summaryMsg = result!.messages.find(
+      m => m.role === 'user' && m.content.includes('Summary of conversation'),
+    )
+    expect(summaryMsg).toBeDefined()
+  })
+
+  it('strips <analysis> scratchpad from the summary', async () => {
+    const mockModel = {
+      async next() {
+        return {
+          type: 'assistant' as const,
+          content: '<analysis>\nThinking about it...\n</analysis>\n\n## Goal\nDo something.',
+        }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'task 1' },
+      { role: 'assistant', content: 'done 1' },
+      { role: 'user', content: 'task 2' },
+      { role: 'assistant', content: 'done 2' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).not.toBeNull()
+    const summaryMsg = result!.messages.find(
+      m => m.role === 'user' && m.content.includes('## Goal'),
+    )
+    expect(summaryMsg).toBeDefined()
+    expect(summaryMsg!.content).not.toContain('<analysis>')
+    expect(summaryMsg!.content).not.toContain('Thinking about it')
+  })
+
+  it('returns null when model returns empty content', async () => {
+    const mockModel = {
+      async next() {
+        return { type: 'assistant' as const, content: '' }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'a' },
+      { role: 'assistant', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'assistant', content: 'd' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).toBeNull()
+  })
+
+  it('returns null when model throws an error', async () => {
+    const mockModel = {
+      async next() {
+        throw new Error('API failure')
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'a' },
+      { role: 'assistant', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'assistant', content: 'd' },
+    ]
+    const result = await compactConversation({ model: mockModel, messages })
+    expect(result).toBeNull()
+  })
+
+  it('passes includeTools: false and maxOutputTokens to model', async () => {
+    let receivedOptions: unknown = undefined
+    const mockModel = {
+      async next(_msgs: ChatMessage[], opts?: unknown) {
+        receivedOptions = opts
+        return { type: 'assistant' as const, content: 'summary' }
+      },
+    }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'a' },
+      { role: 'assistant', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'assistant', content: 'd' },
+    ]
+    await compactConversation({ model: mockModel, messages })
+    expect(receivedOptions).toEqual({
+      maxOutputTokens: 20_000,
+      includeTools: false,
+    })
   })
 })

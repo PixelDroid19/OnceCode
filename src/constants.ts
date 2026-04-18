@@ -37,10 +37,19 @@ export const DEFAULT_CONTEXT_WINDOW = 200_000
 export const COMPACTION_BUFFER_TOKENS = 20_000
 
 /** Max output tokens allowed for the compaction summary request. */
-export const COMPACT_MAX_OUTPUT_TOKENS = 16_000
+export const COMPACT_MAX_OUTPUT_TOKENS = 20_000
 
 /** Number of recent user turns whose tool outputs are protected from micro-compaction. */
 export const MICRO_COMPACT_PROTECT_TURNS = 3
+
+/** Maximum consecutive auto-compact failures before the circuit breaker disables auto-compaction. */
+export const MAX_CONSECUTIVE_COMPACT_FAILURES = 3
+
+/**
+ * Fraction of conversation (by character count) to summarize during compaction.
+ * The remaining portion (most recent messages) is kept verbatim for continuity.
+ */
+export const COMPACT_SUMMARIZE_RATIO = 0.7
 
 /** Characters-per-token ratio used for rough estimation (matches industry standard). */
 export const CHARS_PER_TOKEN = 4

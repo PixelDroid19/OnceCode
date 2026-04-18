@@ -54,6 +54,14 @@ export type AgentStep =
       usage?: TokenUsage
     }
 
+/** Options passed to `ModelAdapter.next()` for specialized requests (e.g. compaction). */
+export interface ModelRequestOptions {
+  /** Override the model's default max output tokens for this single request. */
+  maxOutputTokens?: number
+  /** When `false`, omit tools from the request (e.g. during compaction summaries). */
+  includeTools?: boolean
+}
+
 export interface ModelAdapter {
-  next(messages: ChatMessage[]): Promise<AgentStep>
+  next(messages: ChatMessage[], options?: ModelRequestOptions): Promise<AgentStep>
 }

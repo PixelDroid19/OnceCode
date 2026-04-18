@@ -215,7 +215,7 @@ async function handleInput(
     state.status = t('context_compacting')
     rerender()
     try {
-      const compacted = await compactConversation({
+      const result = await compactConversation({
         model: args.model,
         messages: args.messages,
         onProgress(status) {
@@ -223,15 +223,15 @@ async function handleInput(
           rerender()
         },
       })
-      if (compacted) {
+      if (result) {
         args.messages.length = 0
-        args.messages.push(...compacted)
+        args.messages.push(...result.messages)
         args.contextTracker.resetAfterCompaction()
         pushTranscriptEntry(state, {
           kind: 'assistant',
           body: t('context_compacted', {
-            before: String(args.messages.length),
-            after: String(compacted.length),
+            before: String(result.beforeCount),
+            after: String(result.afterCount),
           }),
         })
       } else {
@@ -297,11 +297,11 @@ async function handleInput(
   rerender()
 
   // ── Auto-compaction check before sending to model ───────────────
-  if (args.contextTracker.shouldCompact()) {
+  if (args.contextTracker.shouldCompact() && args.contextTracker.canAutoCompact()) {
     state.status = t('context_auto_compacting')
     rerender()
     try {
-      const compacted = await compactConversation({
+      const result = await compactConversation({
         model: args.model,
         messages: args.messages,
         onProgress(status) {
@@ -309,17 +309,25 @@ async function handleInput(
           rerender()
         },
       })
-      if (compacted) {
+      if (result) {
         args.messages.length = 0
-        args.messages.push(...compacted)
+        args.messages.push(...result.messages)
         args.contextTracker.resetAfterCompaction()
         pushTranscriptEntry(state, {
           kind: 'progress',
           body: t('context_auto_compacted'),
         })
+        // Synthetic continue message so the model knows to proceed
+        args.messages.push({
+          role: 'user',
+          content: 'Continue if you have next steps, or stop and ask for clarification.',
+        })
+      } else {
+        args.contextTracker.recordCompactFailure()
       }
     } catch {
-      // Auto-compaction failure is non-fatal; continue with full context
+      // Auto-compaction failure is non-fatal; record for circuit breaker
+      args.contextTracker.recordCompactFailure()
     }
     state.status = t('ui_thinking')
     rerender()
