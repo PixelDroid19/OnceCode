@@ -108,6 +108,7 @@ const es = {
   agent_empty_response: 'El modelo devolvió una respuesta vacía. Este turno fue detenido. Reintenta o pide al modelo continuar.{{diagnostics}}',
   agent_diagnostics: 'Diagnóstico: {{details}}.',
   agent_max_steps: 'Se alcanzó el límite máximo de pasos de herramienta para este turno.',
+  agent_cancelled: 'La operación fue cancelada.',
   agent_request_failed: 'La solicitud falló: {{message}}',
   agent_request_failed_no_response: 'La solicitud al modelo falló antes de recibir una respuesta',
 

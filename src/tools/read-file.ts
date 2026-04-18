@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import type { ToolDefinition } from './framework.js'
 import { resolveToolPath } from '@/workspace/paths.js'
+import { trackFileAccess } from '@/tools/frecency.js'
 
 type Input = {
   path: string
@@ -33,6 +34,7 @@ export const readFileTool: ToolDefinition<Input> = {
   }),
   async run(input, context) {
     const target = await resolveToolPath(context, input.path, 'read')
+    trackFileAccess(input.path)
     const content = await readFile(target, 'utf8')
     const offset = Math.max(0, input.offset ?? 0)
     const limit = Math.min(MAX_READ_LIMIT, input.limit ?? DEFAULT_READ_LIMIT)

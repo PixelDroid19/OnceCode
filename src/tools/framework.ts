@@ -3,11 +3,13 @@ import type { PermissionManager } from '@/permissions/manager.js'
 import { t } from '@/i18n/index.js'
 import type { SkillSummary } from '@/session/skills.js'
 import type { McpServerSummary } from '@/mcp/types.js'
+import { ToolCache } from '@/tools/tool-cache.js'
 
 /** Execution context passed to every tool invocation. */
 export type ToolContext = {
   cwd: string
   permissions?: PermissionManager
+  signal?: AbortSignal
 }
 
 /** Metadata for a command launched in the background (e.g. trailing `&`). */
@@ -37,11 +39,6 @@ export type ToolDefinition<TInput> = {
   run(input: TInput, context: ToolContext): Promise<ToolResult>
 }
 
-type CachedToolEntry = {
-  result: ToolResult
-  createdAt: number
-}
-
 type ToolRegistryMetadata = {
   skills?: SkillSummary[]
   mcpServers?: McpServerSummary[]
@@ -52,16 +49,13 @@ export class ToolRegistry {
   private readonly toolsStore: ToolDefinition<unknown>[]
   private metadataStore: ToolRegistryMetadata
   private readonly disposers: Array<() => Promise<void>> = []
-  private readonly resultCache = new Map<string, CachedToolEntry>()
+  private readonly cache: ToolCache<ToolResult>
 
-  private static readonly READ_ONLY_TOOLS = new Set([
+  static readonly READ_ONLY_TOOLS = new Set([
     'list_files',
     'grep_files',
     'read_file',
   ])
-
-  private static readonly CACHE_TTL_MS = 2_000
-  private static readonly MAX_CACHE_ENTRIES = 64
 
   constructor(
     tools: ToolDefinition<unknown>[],
@@ -70,6 +64,7 @@ export class ToolRegistry {
   ) {
     this.toolsStore = [...tools]
     this.metadataStore = metadata
+    this.cache = new ToolCache<ToolResult>()
     if (disposer) {
       this.disposers.push(disposer)
     }
@@ -113,6 +108,11 @@ export class ToolRegistry {
     return this.toolsStore.find(tool => tool.name === name)
   }
 
+  /** Check if a tool is read-only (safe for parallel execution). */
+  isReadOnly(toolName: string): boolean {
+    return ToolRegistry.READ_ONLY_TOOLS.has(toolName)
+  }
+
   private createCacheKey(
     toolName: string,
     input: unknown,
@@ -125,38 +125,8 @@ export class ToolRegistry {
     })
   }
 
-  private getCachedResult(key: string): ToolResult | null {
-    const cached = this.resultCache.get(key)
-    if (!cached) {
-      return null
-    }
-
-    if (Date.now() - cached.createdAt > ToolRegistry.CACHE_TTL_MS) {
-      this.resultCache.delete(key)
-      return null
-    }
-
-    return cached.result
-  }
-
-  private setCachedResult(key: string, result: ToolResult): void {
-    this.resultCache.set(key, {
-      result,
-      createdAt: Date.now(),
-    })
-
-    if (this.resultCache.size <= ToolRegistry.MAX_CACHE_ENTRIES) {
-      return
-    }
-
-    const oldestKey = this.resultCache.keys().next().value
-    if (oldestKey) {
-      this.resultCache.delete(oldestKey)
-    }
-  }
-
   clearCache(): void {
-    this.resultCache.clear()
+    this.cache.clear()
   }
 
   async execute(
@@ -186,27 +156,103 @@ export class ToolRegistry {
       : null
 
     if (cacheKey) {
-      const cached = this.getCachedResult(cacheKey)
-      if (cached) {
-        return cached
+      // Check result cache
+      const cached = this.cache.get(cacheKey)
+      if (cached) return cached
+
+      // Concurrent lookup dedup
+      const inflight = this.cache.getInflight(cacheKey)
+      if (inflight) return inflight
+    }
+
+    const executeInner = async (): Promise<ToolResult> => {
+      try {
+        const result = await tool.run(parsed.data, context)
+        if (cacheKey && result.ok && !result.backgroundTask && !result.awaitUser) {
+          this.cache.set(cacheKey, result)
+        }
+        if (!shouldCache && result.ok) {
+          this.cache.invalidateAfterMutation()
+        }
+        return result
+      } catch (error) {
+        return {
+          ok: false,
+          output: error instanceof Error ? error.message : String(error),
+        }
+      } finally {
+        if (cacheKey) {
+          this.cache.clearInflight(cacheKey)
+        }
       }
     }
 
-    try {
-      const result = await tool.run(parsed.data, context)
-      if (cacheKey && result.ok && !result.backgroundTask && !result.awaitUser) {
-        this.setCachedResult(cacheKey, result)
-      }
-      return result
-    } catch (error) {
-      return {
-        ok: false,
-        output: error instanceof Error ? error.message : String(error),
-      }
+    if (cacheKey) {
+      const promise = executeInner()
+      this.cache.setInflight(cacheKey, promise)
+      return promise
     }
+
+    return executeInner()
   }
 
   async dispose(): Promise<void> {
     await Promise.all(this.disposers.map(disposer => disposer()))
+  }
+}
+
+// ── Concurrency limiter ──────────────────────────────────────────
+
+type QueuedTask<T> = {
+  fn: () => Promise<T>
+  resolve: (value: T) => void
+  reject: (error: unknown) => void
+}
+
+/**
+ * Simple promise-based semaphore for limiting concurrent operations.
+ * Inspired by Effect's concurrency control.
+ */
+export class ConcurrencyLimiter {
+  private running = 0
+  private readonly queue: QueuedTask<unknown>[] = []
+
+  constructor(private readonly maxConcurrency: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.running < this.maxConcurrency) {
+      this.running += 1
+      try {
+        return await fn()
+      } finally {
+        this.running -= 1
+        this.drain()
+      }
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ fn: fn as () => Promise<unknown>, resolve: resolve as (v: unknown) => void, reject })
+    })
+  }
+
+  private drain(): void {
+    if (this.queue.length === 0 || this.running >= this.maxConcurrency) {
+      return
+    }
+
+    const next = this.queue.shift()!
+    this.running += 1
+    next.fn().then(
+      value => {
+        next.resolve(value)
+        this.running -= 1
+        this.drain()
+      },
+      error => {
+        next.reject(error)
+        this.running -= 1
+        this.drain()
+      },
+    )
   }
 }

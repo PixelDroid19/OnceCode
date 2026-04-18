@@ -60,6 +60,8 @@ export interface ModelRequestOptions {
   maxOutputTokens?: number
   /** When `false`, omit tools from the request (e.g. during compaction summaries). */
   includeTools?: boolean
+  /** When provided, use SSE streaming and emit text deltas progressively. */
+  onTextDelta?: (text: string) => void
 }
 
 export interface ModelAdapter {

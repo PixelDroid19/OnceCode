@@ -1,5 +1,5 @@
 import type { ToolRegistry } from '@/tools/framework.js'
-import type { ChatMessage, ModelAdapter, ModelRequestOptions, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
+import type { ChatMessage, ModelAdapter, ModelRequestOptions, AgentStep, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
 import {
@@ -7,10 +7,10 @@ import {
   getRetryDelayMs,
   parseRetryAfterMs,
   readJsonBody,
-  shouldRetryStatus,
   sleep,
 } from '@/utils/http.js'
 import { t } from '@/i18n/index.js'
+import { gzipSync } from 'node:zlib'
 
 const DEFAULT_MAX_RETRIES = 4
 
@@ -31,6 +31,17 @@ function getRetryLimit(): number {
     return DEFAULT_MAX_RETRIES
   }
   return Math.floor(value)
+}
+
+/**
+ * Conditional retry filtering: only retry on transient errors.
+ * 429 (rate limit) and 5xx (server errors) are retryable.
+ * 401/403 (auth), 400 (bad request), 404 are NOT retryable.
+ */
+function isRetryableStatus(status: number): boolean {
+  if (status === 429) return true
+  if (status >= 500 && status < 600) return true
+  return false
 }
 
 function isTextBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
@@ -204,18 +215,32 @@ export class AnthropicModelAdapter implements ModelAdapter {
       }))
     }
 
+    // Use SSE streaming when a text delta callback is provided
+    const useStreaming = typeof options?.onTextDelta === 'function'
+    if (useStreaming) {
+      requestBody.stream = true
+    }
+
+    const bodyJson = JSON.stringify(requestBody)
+    const useGzip = bodyJson.length > 4_096
+    const bodyPayload = useGzip ? gzipSync(bodyJson) : bodyJson
+
+    if (useGzip) {
+      headers['content-encoding'] = 'gzip'
+    }
+
     const maxRetries = getRetryLimit()
     let response: Response | null = null
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(requestBody),
+        body: bodyPayload,
       })
       if (response.ok) {
         break
       }
-      if (!shouldRetryStatus(response.status) || attempt >= maxRetries) {
+      if (!isRetryableStatus(response.status) || attempt >= maxRetries) {
         break
       }
       const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
@@ -226,10 +251,22 @@ export class AnthropicModelAdapter implements ModelAdapter {
       throw new Error(t('agent_request_failed_no_response'))
     }
 
+    if (!response.ok) {
+      const data = await readJsonBody(response)
+      throw new Error(extractErrorMessage(data, response.status))
+    }
+
+    if (useStreaming) {
+      return this.parseStreamingResponse(response, options!.onTextDelta!)
+    }
+
+    return this.parseBatchResponse(response)
+  }
+
+  private async parseBatchResponse(response: Response): Promise<AgentStep> {
     const data = (await readJsonBody(response)) as {
       stop_reason?: string
       content?: AnthropicContentBlock[]
-      error?: { message?: string }
       usage?: {
         input_tokens?: number
         output_tokens?: number
@@ -238,71 +275,201 @@ export class AnthropicModelAdapter implements ModelAdapter {
       }
     }
 
-    if (!response.ok) {
-      throw new Error(extractErrorMessage(data, response.status))
+    return buildAgentStep(data.content ?? [], data.stop_reason, data.usage)
+  }
+
+  private async parseStreamingResponse(
+    response: Response,
+    onTextDelta: (text: string) => void,
+  ): Promise<AgentStep> {
+    const body = response.body
+    if (!body) {
+      throw new Error('Streaming response has no body')
     }
 
-    const toolCalls: ToolCall[] = []
-    const textParts: string[] = []
-    const blockTypes: string[] = []
-    const ignoredBlockTypes = new Set<string>()
+    const blocks: AnthropicContentBlock[] = []
+    let currentBlockIndex = -1
+    let currentToolJsonChunks: string[] = []
+    let stopReason: string | undefined
+    let usage: TokenUsage | undefined
 
-    for (const block of data.content ?? []) {
-      blockTypes.push(block.type)
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
 
-      if (isTextBlock(block)) {
-        textParts.push(block.text)
-        continue
-      }
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-      if (isToolUseBlock(block)) {
-        toolCalls.push({
-          id: block.id,
-          toolName: block.name,
-          input: block.input,
-        })
-        continue
-      }
+        buffer += decoder.decode(value, { stream: true })
 
-      ignoredBlockTypes.add(block.type)
-    }
+        // Process complete SSE lines
+        let newlineIdx: number
+        while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newlineIdx).trim()
+          buffer = buffer.slice(newlineIdx + 1)
 
-    const parsedText = parseAssistantText(textParts.join('\n').trim())
-    const diagnostics: StepDiagnostics = {
-      stopReason: data.stop_reason,
-      blockTypes,
-      ignoredBlockTypes: [...ignoredBlockTypes],
-    }
+          if (!line.startsWith('data: ')) continue
+          const jsonStr = line.slice(6)
+          if (jsonStr === '[DONE]') continue
 
-    const usage: TokenUsage | undefined = data.usage
-      ? {
-          inputTokens: data.usage.input_tokens ?? 0,
-          outputTokens: data.usage.output_tokens ?? 0,
-          cacheCreationInputTokens: data.usage.cache_creation_input_tokens ?? 0,
-          cacheReadInputTokens: data.usage.cache_read_input_tokens ?? 0,
+          let event: Record<string, unknown>
+          try {
+            event = JSON.parse(jsonStr) as Record<string, unknown>
+          } catch {
+            continue
+          }
+
+          const eventType = event.type as string
+
+          if (eventType === 'content_block_start') {
+            currentBlockIndex = (event.index as number) ?? blocks.length
+            const block = event.content_block as AnthropicContentBlock
+            blocks[currentBlockIndex] = block
+            currentToolJsonChunks = []
+          }
+
+          if (eventType === 'content_block_delta') {
+            const delta = event.delta as Record<string, unknown>
+            if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+              onTextDelta(delta.text)
+              // Accumulate text in the block
+              const textBlock = blocks[currentBlockIndex]
+              if (textBlock && 'text' in textBlock) {
+                (textBlock as { text: string }).text += delta.text
+              }
+            }
+            if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+              currentToolJsonChunks.push(delta.partial_json)
+            }
+          }
+
+          if (eventType === 'content_block_stop') {
+            // Finalize tool use input from accumulated JSON chunks
+            if (currentToolJsonChunks.length > 0 && blocks[currentBlockIndex]) {
+              const block = blocks[currentBlockIndex]
+              if (block.type === 'tool_use') {
+                try {
+                  (block as { input: unknown }).input = JSON.parse(currentToolJsonChunks.join(''))
+                } catch {
+                  (block as { input: unknown }).input = {}
+                }
+              }
+            }
+            currentToolJsonChunks = []
+          }
+
+          if (eventType === 'message_start') {
+            const msg = event.message as Record<string, unknown> | undefined
+            if (msg?.usage) {
+              const u = msg.usage as Record<string, number>
+              usage = {
+                inputTokens: u.input_tokens ?? 0,
+                outputTokens: u.output_tokens ?? 0,
+                cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+                cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+              }
+            }
+          }
+
+          if (eventType === 'message_delta') {
+            const delta = event.delta as Record<string, unknown> | undefined
+            if (delta?.stop_reason) {
+              stopReason = delta.stop_reason as string
+            }
+            const deltaUsage = event.usage as Record<string, number> | undefined
+            if (deltaUsage && usage) {
+              usage.outputTokens = deltaUsage.output_tokens ?? usage.outputTokens
+            }
+          }
         }
-      : undefined
-
-    if (toolCalls.length > 0) {
-      return {
-        type: 'tool_calls' as const,
-        calls: toolCalls,
-        content: parsedText.content || undefined,
-        contentKind:
-          parsedText.kind === 'progress'
-            ? ('progress' as const)
-            : undefined,
-        diagnostics,
-        usage,
       }
+    } finally {
+      reader.releaseLock()
     }
 
+    return buildAgentStep(blocks, stopReason, usage ? {
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      cache_creation_input_tokens: usage.cacheCreationInputTokens,
+      cache_read_input_tokens: usage.cacheReadInputTokens,
+    } : undefined)
+  }
+}
+
+// ── Shared step builder ──────────────────────────────────────────
+
+function buildAgentStep(
+  blocks: AnthropicContentBlock[],
+  stopReason?: string,
+  rawUsage?: {
+    input_tokens?: number
+    output_tokens?: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  },
+): AgentStep {
+  const toolCalls: ToolCall[] = []
+  const textParts: string[] = []
+  const blockTypes: string[] = []
+  const ignoredBlockTypes = new Set<string>()
+
+  for (const block of blocks) {
+    blockTypes.push(block.type)
+
+    if (isTextBlock(block)) {
+      textParts.push(block.text)
+      continue
+    }
+
+    if (isToolUseBlock(block)) {
+      toolCalls.push({
+        id: block.id,
+        toolName: block.name,
+        input: block.input,
+      })
+      continue
+    }
+
+    ignoredBlockTypes.add(block.type)
+  }
+
+  const parsedText = parseAssistantText(textParts.join('\n').trim())
+  const diagnostics: StepDiagnostics = {
+    stopReason,
+    blockTypes,
+    ignoredBlockTypes: [...ignoredBlockTypes],
+  }
+
+  const usage: TokenUsage | undefined = rawUsage
+    ? {
+        inputTokens: rawUsage.input_tokens ?? 0,
+        outputTokens: rawUsage.output_tokens ?? 0,
+        cacheCreationInputTokens: rawUsage.cache_creation_input_tokens ?? 0,
+        cacheReadInputTokens: rawUsage.cache_read_input_tokens ?? 0,
+      }
+    : undefined
+
+  if (toolCalls.length > 0) {
     return {
-      type: 'assistant' as const,
-      content: parsedText.content,
-      kind: parsedText.kind,
+      type: 'tool_calls' as const,
+      calls: toolCalls,
+      content: parsedText.content || undefined,
+      contentKind:
+        parsedText.kind === 'progress'
+          ? ('progress' as const)
+          : undefined,
       diagnostics,
       usage,
     }
+  }
+
+  return {
+    type: 'assistant' as const,
+    content: parsedText.content,
+    kind: parsedText.kind,
+    diagnostics,
+    usage,
   }
 }

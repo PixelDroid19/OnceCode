@@ -9,6 +9,9 @@ import { resolveToolPath } from '@/workspace/paths.js'
 
 const execFileAsync = promisify(execFile)
 
+/** Default timeout for foreground commands (ms). */
+const COMMAND_TIMEOUT_MS = 60_000
+
 // OnceCode separates "read-only shell commands" from mutating/runtime commands.
 // We keep the same shape here so safe observability commands are easy to extend.
 const READONLY_COMMANDS = new Set([
@@ -186,6 +189,8 @@ export const runCommandTool: ToolDefinition<Input> = {
       cwd: effectiveCwd,
       maxBuffer: 1024 * 1024,
       env: process.env,
+      timeout: COMMAND_TIMEOUT_MS,
+      signal: AbortSignal.timeout(COMMAND_TIMEOUT_MS),
     })
 
     return {

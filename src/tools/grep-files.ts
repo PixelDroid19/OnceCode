@@ -1,15 +1,18 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { ToolDefinition } from './framework.js'
 import { resolveToolPath } from '@/workspace/paths.js'
-
-const execFileAsync = promisify(execFile)
+import { execStreaming } from '@/utils/exec-streaming.js'
 
 type Input = {
   pattern: string
   path?: string
 }
+
+/** Default timeout for grep operations (ms). */
+const GREP_TIMEOUT_MS = 30_000
+
+/** Max output lines from a single grep. */
+const GREP_MAX_LINES = 500
 
 export const grepFilesTool: ToolDefinition<Input> = {
   name: 'grep_files',
@@ -34,14 +37,21 @@ export const grepFilesTool: ToolDefinition<Input> = {
       args.push('.')
     }
 
-    const result = await execFileAsync('rg', args, {
+    const result = await execStreaming({
+      command: 'rg',
+      args,
       cwd: context.cwd,
-      maxBuffer: 1024 * 1024,
+      timeoutMs: GREP_TIMEOUT_MS,
+      maxLines: GREP_MAX_LINES,
+      signal: context.signal,
     })
+
+    const output = (result.stdout || result.stderr || '').trim() || '(no matches)'
+    const suffix = result.truncated ? '\n... (output truncated)' : ''
 
     return {
       ok: true,
-      output: (result.stdout || result.stderr || '').trim() || '(no matches)',
+      output: output + suffix,
     }
   },
 }

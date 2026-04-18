@@ -108,6 +108,7 @@ const en = {
   agent_empty_response: 'The model returned an empty response. This turn was stopped. Retry or ask the model to continue.{{diagnostics}}',
   agent_diagnostics: 'Diagnostics: {{details}}.',
   agent_max_steps: 'Reached the maximum tool-step limit for this turn.',
+  agent_cancelled: 'The operation was cancelled.',
   agent_request_failed: 'Request failed: {{message}}',
   agent_request_failed_no_response: 'Model request failed before receiving a response',
 

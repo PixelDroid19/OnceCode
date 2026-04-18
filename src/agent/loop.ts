@@ -1,7 +1,10 @@
-import type { ToolRegistry } from '@/tools/framework.js'
-import type { ChatMessage, ModelAdapter, TokenUsage } from '@/types.js'
+import type { ToolRegistry, ToolResult } from '@/tools/framework.js'
+import type { ChatMessage, ModelAdapter, TokenUsage, ToolCall } from '@/types.js'
 import type { PermissionManager } from '@/permissions/manager.js'
 import { t } from '@/i18n/index.js'
+
+/** Maximum number of read-only tools to execute in parallel. */
+const MAX_PARALLEL_TOOLS = 5
 
 function isEmptyAssistantResponse(content: string): boolean {
   return content.trim().length === 0
@@ -75,6 +78,7 @@ export async function runAgentTurn(args: {
   cwd: string
   permissions?: PermissionManager
   maxSteps?: number
+  signal?: AbortSignal
   onToolStart?: (toolName: string, input: unknown) => void
   onToolResult?: (toolName: string, output: string, isError: boolean) => void
   onAssistantMessage?: (content: string) => void
@@ -99,6 +103,14 @@ export async function runAgentTurn(args: {
   }
 
   for (let step = 0; maxSteps == null || step < maxSteps; step++) {
+    // Check for cancellation at each iteration
+    if (args.signal?.aborted) {
+      return [
+        ...messages,
+        { role: 'assistant', content: t('agent_cancelled') },
+      ]
+    }
+
     const next = await args.model.next(messages)
 
     // Report usage to the tracker after every API call
@@ -235,38 +247,46 @@ export async function runAgentTurn(args: {
       return messages
     }
 
-    for (const call of next.calls) {
-      args.onToolStart?.(call.toolName, call.input)
-      const result = await args.tools.execute(
-        call.toolName,
-        call.input,
-        { cwd: args.cwd, permissions: args.permissions },
-      )
+    // ── Parallel/sequential tool execution ────────────────────────
+    // Partition calls into contiguous batches: read-only calls can run
+    // in parallel, mutating calls run one at a time and flush any
+    // pending read-only batch first.
+    const callResults = await executeBatchedToolCalls({
+      calls: next.calls,
+      tools: args.tools,
+      cwd: args.cwd,
+      permissions: args.permissions,
+      signal: args.signal,
+      onToolStart: args.onToolStart,
+      onToolResult: args.onToolResult,
+    })
+
+    let earlyReturn = false
+    for (const item of callResults) {
       sawToolResultThisTurn = true
-      if (!result.ok) {
+      if (!item.result.ok) {
         toolErrorCount += 1
       }
-      args.onToolResult?.(call.toolName, result.output, !result.ok)
 
       messages = [
         ...messages,
         {
           role: 'assistant_tool_call',
-          toolUseId: call.id,
-          toolName: call.toolName,
-          input: call.input,
+          toolUseId: item.call.id,
+          toolName: item.call.toolName,
+          input: item.call.input,
         },
         {
           role: 'tool_result',
-          toolUseId: call.id,
-          toolName: call.toolName,
-          content: result.output,
-          isError: !result.ok,
+          toolUseId: item.call.id,
+          toolName: item.call.toolName,
+          content: item.result.output,
+          isError: !item.result.ok,
         },
       ]
 
-      if (result.awaitUser) {
-        const question = result.output.trim()
+      if (item.result.awaitUser) {
+        const question = item.result.output.trim()
         if (question.length > 0) {
           args.onAssistantMessage?.(question)
           messages = [
@@ -277,8 +297,13 @@ export async function runAgentTurn(args: {
             },
           ]
         }
-        return messages
+        earlyReturn = true
+        break
       }
+    }
+
+    if (earlyReturn) {
+      return messages
     }
   }
 
@@ -291,4 +316,110 @@ export async function runAgentTurn(args: {
       content: maxStepContent,
     },
   ]
+}
+
+// ── Batched parallel/sequential tool execution ───────────────────
+
+type CallResult = {
+  call: ToolCall
+  result: ToolResult
+}
+
+/**
+ * Executes tool calls with optimal concurrency:
+ * - Consecutive read-only calls run in parallel (up to MAX_PARALLEL_TOOLS)
+ * - Mutating calls run sequentially, flushing any pending read-only batch first
+ * - Order of results matches the original call order
+ */
+async function executeBatchedToolCalls(args: {
+  calls: ToolCall[]
+  tools: ToolRegistry
+  cwd: string
+  permissions?: PermissionManager
+  signal?: AbortSignal
+  onToolStart?: (toolName: string, input: unknown) => void
+  onToolResult?: (toolName: string, output: string, isError: boolean) => void
+}): Promise<CallResult[]> {
+  const results: CallResult[] = []
+  let readOnlyBatch: ToolCall[] = []
+
+  const flushReadOnlyBatch = async () => {
+    if (readOnlyBatch.length === 0) return
+
+    const batch = readOnlyBatch
+    readOnlyBatch = []
+
+    for (const call of batch) {
+      args.onToolStart?.(call.toolName, call.input)
+    }
+
+    // Execute in parallel with concurrency cap
+    const batchResults = await executeParallel(
+      batch,
+      call => args.tools.execute(call.toolName, call.input, {
+        cwd: args.cwd,
+        permissions: args.permissions,
+        signal: args.signal,
+      }),
+      MAX_PARALLEL_TOOLS,
+    )
+
+    for (let i = 0; i < batch.length; i++) {
+      const call = batch[i]
+      const result = batchResults[i]
+      args.onToolResult?.(call.toolName, result.output, !result.ok)
+      results.push({ call, result })
+    }
+  }
+
+  for (const call of args.calls) {
+    if (args.tools.isReadOnly(call.toolName)) {
+      readOnlyBatch.push(call)
+    } else {
+      // Flush pending read-only batch before running mutating call
+      await flushReadOnlyBatch()
+
+      args.onToolStart?.(call.toolName, call.input)
+      const result = await args.tools.execute(call.toolName, call.input, {
+        cwd: args.cwd,
+        permissions: args.permissions,
+        signal: args.signal,
+      })
+      args.onToolResult?.(call.toolName, result.output, !result.ok)
+      results.push({ call, result })
+    }
+  }
+
+  // Flush any remaining read-only batch
+  await flushReadOnlyBatch()
+
+  return results
+}
+
+/** Runs tasks in parallel with a concurrency cap, preserving order. */
+async function executeParallel<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  maxConcurrency: number,
+): Promise<R[]> {
+  if (items.length <= 1) {
+    return items.length === 0 ? [] : [await fn(items[0])]
+  }
+
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const idx = nextIndex++
+      results[idx] = await fn(items[idx])
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(maxConcurrency, items.length) },
+    () => worker(),
+  )
+  await Promise.all(workers)
+  return results
 }
