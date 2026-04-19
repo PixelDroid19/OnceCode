@@ -1,9 +1,13 @@
-import type { ChatMessage, TokenUsage } from '@/types.js'
 import {
   CONTEXT_ERROR_THRESHOLD,
   CONTEXT_WARNING_THRESHOLD,
   MAX_CONSECUTIVE_COMPACT_FAILURES,
 } from '@/constants.js'
+import type { ChatMessage, TokenUsage } from '@/types.js'
+import type { ModelInfo } from '@/provider/catalog.js'
+import {
+  formatModelRef,
+} from '@/provider/catalog.js'
 import {
   getContextUsageFraction,
   getContextWindowSize,
@@ -13,10 +17,8 @@ import {
   shouldCompactNextTurn,
 } from './window.js'
 
-/** Warning level for TUI context usage display. */
 export type ContextWarningLevel = 'normal' | 'warning' | 'error'
 
-/** Read-only snapshot of context tracking state for display purposes. */
 export interface ContextSnapshot {
   model: string
   contextWindow: number
@@ -35,17 +37,21 @@ export interface ContextSnapshot {
   shouldCompact: boolean
 }
 
-/**
- * Tracks token usage across a session, detects context overflow,
- * and provides data for the TUI context badge.
- *
- * The tracker uses the **last API-reported input token count** as
- * the proxy for current context size, because that reflects the
- * actual token count the provider computed for the most recent
- * request (including system prompt, tools, and full message history).
- */
+function resolveModel(input: string | ModelInfo): ModelInfo | string {
+  if (typeof input !== 'string') {
+    return input
+  }
+
+  return input
+}
+
+function formatModel(input: string | ModelInfo): string {
+  if (typeof input === 'string') return input
+  return formatModelRef(input)
+}
+
 export class ContextTracker {
-  #model: string
+  #model: string | ModelInfo
   #configuredMaxOutputTokens: number | undefined
   #lastInputTokens = 0
   #totalInputTokens = 0
@@ -56,17 +62,16 @@ export class ContextTracker {
   #consecutiveCompactFailures = 0
   #projectedPostCompactTokens = 0
 
-  constructor(model: string, configuredMaxOutputTokens?: number) {
-    this.#model = model
+  constructor(model: string | ModelInfo, configuredMaxOutputTokens?: number) {
+    this.#model = resolveModel(model)
     this.#configuredMaxOutputTokens = configuredMaxOutputTokens
   }
 
-  /** Updates the model (e.g. after `/model` command). */
-  setModel(model: string): void {
-    this.#model = model
+  setModel(model: string | ModelInfo, configuredMaxOutputTokens?: number): void {
+    this.#model = resolveModel(model)
+    this.#configuredMaxOutputTokens = configuredMaxOutputTokens
   }
 
-  /** Records a single API response's usage data. */
   recordUsage(usage: TokenUsage): void {
     this.#lastInputTokens = usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens
     this.#projectedPostCompactTokens = 0
@@ -77,48 +82,33 @@ export class ContextTracker {
     this.#requestCount += 1
   }
 
-  /** Seeds tracker state from the projected post-compact context. */
   resetAfterCompaction(projectedPostCompactTokens?: number): void {
-    const safeProjected = Math.max(0, Math.floor(projectedPostCompactTokens ?? 0))
-    this.#lastInputTokens = safeProjected
-    this.#projectedPostCompactTokens = safeProjected
+    const safe = Math.max(0, Math.floor(projectedPostCompactTokens ?? 0))
+    this.#lastInputTokens = safe
+    this.#projectedPostCompactTokens = safe
     this.#consecutiveCompactFailures = 0
-    // Keep cumulative totals — they represent session-lifetime usage.
-    // Seed the "last" pointer until the next API response replaces it.
   }
 
-  /** Records a compaction failure for the circuit breaker. */
   recordCompactFailure(): void {
     this.#consecutiveCompactFailures += 1
   }
 
-  /** Resets the compaction failure counter (call after a successful compaction). */
   resetCompactFailures(): void {
     this.#consecutiveCompactFailures = 0
   }
 
-  /**
-   * Whether auto-compaction is allowed based on the circuit breaker.
-   * Returns `false` after `MAX_CONSECUTIVE_COMPACT_FAILURES` consecutive failures.
-   */
   canAutoCompact(): boolean {
     return this.#consecutiveCompactFailures < MAX_CONSECUTIVE_COMPACT_FAILURES
   }
 
-  /** Current number of consecutive compaction failures. */
   get consecutiveCompactFailures(): number {
     return this.#consecutiveCompactFailures
   }
 
-  /** Whether the context is overflowing and compaction should trigger. */
   shouldCompact(): boolean {
     return shouldCompact(this.#model, this.#lastInputTokens, this.#configuredMaxOutputTokens)
   }
 
-  /**
-   * Predicts whether the next request should compact after adding any pending
-   * messages that were not included in the last provider-reported usage.
-   */
   shouldCompactNextTurn(
     messages: ChatMessage[],
     alreadyCountedMessages?: ChatMessage[],
@@ -132,17 +122,14 @@ export class ContextTracker {
     })
   }
 
-  /** Context usage as a 0–1 fraction. */
   get usageFraction(): number {
     return getContextUsageFraction(this.#model, this.#lastInputTokens)
   }
 
-  /** Context usage as 0–100 integer. */
   get usagePercent(): number {
     return Math.round(this.usageFraction * 100)
   }
 
-  /** Warning level for TUI display. */
   get warningLevel(): ContextWarningLevel {
     const fraction = this.usageFraction
     if (fraction >= CONTEXT_ERROR_THRESHOLD) return 'error'
@@ -150,27 +137,23 @@ export class ContextTracker {
     return 'normal'
   }
 
-  /** Last API-reported input tokens (proxy for context size). */
   get lastInputTokens(): number {
     return this.#lastInputTokens
   }
 
-  /** Estimated context size immediately after compaction, before the next API response. */
   get projectedPostCompactTokens(): number {
     return this.#projectedPostCompactTokens
   }
 
-  /** Total API requests made in this session. */
   get requestCount(): number {
     return this.#requestCount
   }
 
-  /** Returns a read-only snapshot of all tracking state. */
   snapshot(): ContextSnapshot {
     const contextWindow = getContextWindowSize(this.#model)
     const maxOutputTokens = resolveMaxOutputTokens(this.#model, this.#configuredMaxOutputTokens)
     return {
-      model: this.#model,
+      model: formatModel(this.#model),
       contextWindow,
       maxOutputTokens,
       effectiveBudget: getEffectiveContextBudget(this.#model, this.#configuredMaxOutputTokens),
@@ -188,7 +171,6 @@ export class ContextTracker {
     }
   }
 
-  /** Formats a human-readable summary string (used by /context command). */
   formatSummary(): string {
     const snap = this.snapshot()
     const pct = snap.usagePercent
@@ -219,7 +201,6 @@ export class ContextTracker {
   }
 }
 
-/** Formats a token count for human display (e.g. 145000 → "145K"). */
 export function formatTokenCount(count: number): string {
   if (count >= 1_000_000) {
     const m = count / 1_000_000

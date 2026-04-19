@@ -15,19 +15,38 @@ import {
   saveMcpTokensFile,
   saveScopedMcpServers,
 } from './store.js'
+import {
+  ONCECODE_PROVIDERS_PATH,
+  readProviderState,
+  type ProviderConnection,
+  type ProviderState,
+} from './provider-store.js'
 import { t } from '@/i18n/index.js'
 import type { LanguageSetting } from '@/i18n/languages.js'
+import {
+  createUnknownModel,
+  formatModelRef,
+  getConfiguredProviders,
+  getDefaultModel,
+  getModelInfo,
+  getProviderInfo,
+  inferProvider,
+  listProviders,
+  parseModelRef,
+  resolveSelection,
+  type ModelInfo,
+  type ProviderInfo,
+} from '@/provider/catalog.js'
 
-/** User-facing settings stored in ~/.oncecode/settings.json. */
 export type OnceCodeSettings = {
   env?: Record<string, string | number>
   language?: LanguageSetting
   model?: string
+  provider?: string
   maxOutputTokens?: number
   mcpServers?: Record<string, McpServerConfig>
 }
 
-/** Configuration for a single MCP server (stdio or HTTP). */
 export type McpServerConfig = {
   command: string
   args?: string[]
@@ -39,18 +58,28 @@ export type McpServerConfig = {
   protocol?: 'auto' | 'content-length' | 'newline-json' | 'streamable-http'
 }
 
-/** Fully resolved config derived from settings, env vars, and MCP configs. */
-export type RuntimeConfig = {
-  model: string
+export type RuntimeProviderConfig = {
+  id: string
+  name: string
+  transport: ProviderInfo['transport']
   baseUrl: string
-  authToken?: string
-  apiKey?: string
+  auth: {
+    env: string
+    type: 'bearer' | 'header' | 'query'
+    value: string
+    name?: string
+  }
+}
+
+export type RuntimeConfig = {
+  provider: RuntimeProviderConfig
+  model: ModelInfo
+  modelRef: string
   maxOutputTokens?: number
   mcpServers: Record<string, McpServerConfig>
   sourceSummary: string
 }
 
-/** Whether an MCP config applies globally or to the current project. */
 export type McpConfigScope = 'user' | 'project'
 
 export {
@@ -68,26 +97,27 @@ export {
   readSettingsFile,
   saveMcpTokensFile,
   saveScopedMcpServers,
+  ONCECODE_PROVIDERS_PATH,
 }
 
 function mergeSettings(
   base: OnceCodeSettings,
   override: OnceCodeSettings,
 ): OnceCodeSettings {
-  const mergedMcpServers = {
+  const mcpServers = {
     ...(base.mcpServers ?? {}),
   }
 
   for (const [name, server] of Object.entries(override.mcpServers ?? {})) {
-    mergedMcpServers[name] = {
-      ...(mergedMcpServers[name] ?? {}),
+    mcpServers[name] = {
+      ...(mcpServers[name] ?? {}),
       ...server,
       env: {
-        ...(mergedMcpServers[name]?.env ?? {}),
+        ...(mcpServers[name]?.env ?? {}),
         ...(server.env ?? {}),
       },
       headers: {
-        ...(mergedMcpServers[name]?.headers ?? {}),
+        ...(mcpServers[name]?.headers ?? {}),
         ...(server.headers ?? {}),
       },
     }
@@ -100,18 +130,16 @@ function mergeSettings(
       ...(base.env ?? {}),
       ...(override.env ?? {}),
     },
-    mcpServers: mergedMcpServers,
+    mcpServers,
   }
 }
 
-/** Merges all config sources (global MCP, project MCP, oncecode settings). */
 export async function loadEffectiveSettings(): Promise<OnceCodeSettings> {
-  const [globalMcpConfig, projectMcpConfig, onceCodeSettings] =
-    await Promise.all([
-      readMcpConfigFile(ONCECODE_MCP_PATH),
-      readMcpConfigFile(PROJECT_MCP_PATH),
-      readSettingsFile(ONCECODE_SETTINGS_PATH),
-    ])
+  const [globalMcpConfig, projectMcpConfig, onceCodeSettings] = await Promise.all([
+    readMcpConfigFile(ONCECODE_MCP_PATH),
+    readMcpConfigFile(PROJECT_MCP_PATH),
+    readSettingsFile(ONCECODE_SETTINGS_PATH),
+  ])
   return mergeSettings(
     mergeSettings(
       { mcpServers: globalMcpConfig },
@@ -121,7 +149,6 @@ export async function loadEffectiveSettings(): Promise<OnceCodeSettings> {
   )
 }
 
-/** Persists partial settings updates by merging them into the existing file. */
 export async function saveOnceCodeSettings(
   updates: OnceCodeSettings,
 ): Promise<void> {
@@ -135,55 +162,275 @@ export async function saveOnceCodeSettings(
   )
 }
 
-/** Builds the final runtime config from merged settings and environment variables. */
-export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-  const effectiveSettings = await loadEffectiveSettings()
-  const env = {
-    ...(effectiveSettings.env ?? {}),
-    ...process.env,
+function getConnection(
+  state: ProviderState,
+  providerId?: string,
+): ProviderConnection | null {
+  const id = String(providerId ?? '').trim().toLowerCase()
+  if (!id) return null
+
+  const direct = state.providers?.[id]
+  if (direct) return direct
+
+  return (
+    Object.values(state.providers ?? {}).find(
+      item => item.providerId.trim().toLowerCase() === id,
+    ) ?? null
+  )
+}
+
+function pickStoredProviderId(state: ProviderState): string {
+  const active = String(state.activeProvider ?? '').trim()
+  if (active) return active
+
+  const ids = Object.values(state.providers ?? {})
+    .map(item => item.providerId.trim())
+    .filter(Boolean)
+
+  return ids.length === 1 ? (ids[0] ?? '') : ''
+}
+
+function pickStoredModel(state: ProviderState, providerId?: string): string {
+  const active = String(state.activeModel ?? '').trim()
+  if (active) return active
+
+  const stored = getConnection(state, providerId)?.model?.trim()
+  if (stored) return stored
+
+  const provider = pickStoredProviderId(state)
+  if (!provider) return ''
+
+  return getConnection(state, provider)?.model?.trim() ?? ''
+}
+
+function toModelId(input: string): string {
+  const parsed = parseModelRef(input)
+  return parsed ? parsed.modelId : input.trim()
+}
+
+function buildStoredEnv(
+  settings: OnceCodeSettings,
+  state: ProviderState,
+): Record<string, string | number> {
+  const env = { ...(settings.env ?? {}) }
+
+  for (const item of Object.values(state.providers ?? {})) {
+    const provider = getProviderInfo(item.providerId)
+    if (!provider) continue
+
+    Object.assign(env, item.vars ?? {})
+
+    if (item.baseUrl && provider.baseUrlEnv[0]) {
+      env[provider.baseUrlEnv[0]] = item.baseUrl
+    }
+
+    if (item.model && provider.modelEnv[0]) {
+      env[provider.modelEnv[0]] = toModelId(item.model)
+    }
   }
 
-  const model =
-    String(env.ONCECODE_MODEL ?? '').trim() ||
-    effectiveSettings.model ||
-    String(env.ANTHROPIC_MODEL ?? '').trim()
+  return env
+}
 
-  const baseUrl =
-    String(env.ANTHROPIC_BASE_URL ?? '').trim() || 'https://api.anthropic.com'
-  const authToken = String(env.ANTHROPIC_AUTH_TOKEN ?? '').trim() || undefined
-  const apiKey = String(env.ANTHROPIC_API_KEY ?? '').trim() || undefined
-  const rawMaxOutputTokens =
-    env.ONCECODE_MAX_OUTPUT_TOKENS ?? effectiveSettings.maxOutputTokens
-  const parsedMaxOutputTokens =
-    rawMaxOutputTokens === undefined ? NaN : Number(rawMaxOutputTokens)
+function pickModelInput(args: {
+  env: Record<string, string | number | undefined>
+  settings: OnceCodeSettings
+  state: ProviderState
+}): string {
+  const explicit = String(args.env.ONCECODE_MODEL ?? '').trim()
+  if (explicit) return explicit
+
+  const stored = pickStoredModel(
+    args.state,
+    pickStoredProviderId(args.state) || args.settings.provider?.trim(),
+  )
+  if (stored) return stored
+
+  if (args.settings.model?.trim()) return args.settings.model.trim()
+
+  const provider = pickStoredProviderId(args.state) || args.settings.provider?.trim()
+  if (provider) {
+    const defaults = getDefaultModel(provider)
+    if (defaults) return formatModelRef(defaults)
+  }
+
+  for (const info of listProviders()) {
+    for (const key of info.modelEnv) {
+      const value = String(args.env[key] ?? '').trim()
+      if (value) {
+        return value.includes(':') ? value : `${info.id}:${value}`
+      }
+    }
+  }
+
+  return ''
+}
+
+function pickProvider(args: {
+  env: Record<string, string | number | undefined>
+  settings: OnceCodeSettings
+  state: ProviderState
+  modelInput: string
+}): ProviderInfo | null {
+  const envProvider = String(args.env.ONCECODE_PROVIDER ?? '').trim()
+  if (envProvider) {
+    return getProviderInfo(envProvider)
+  }
+
+  const resolved = resolveSelection({
+    input: args.modelInput,
+    env: args.env,
+  })
+  if (resolved) {
+    return resolved.provider
+  }
+
+  const storedProvider = pickStoredProviderId(args.state)
+  if (storedProvider) {
+    return getProviderInfo(storedProvider)
+  }
+
+  if (args.settings.provider?.trim()) {
+    return getProviderInfo(args.settings.provider.trim())
+  }
+
+  const configured = getConfiguredProviders(args.env as NodeJS.ProcessEnv)
+  if (configured.length === 1) {
+    return configured[0] ?? null
+  }
+
+  return inferProvider(args.modelInput, args.env)
+}
+
+function fallbackProvider(
+  env: Record<string, string | number | undefined>,
+  state: ProviderState,
+): ProviderInfo {
+  const stored = getProviderInfo(pickStoredProviderId(state))
+  if (stored) {
+    return stored
+  }
+
+  const configured = getConfiguredProviders(env)
+  if (configured.length > 0) {
+    return configured[0] ?? listProviders()[0]!
+  }
+
+  return getProviderInfo('anthropic') ?? listProviders()[0]!
+}
+
+function pickAuth(
+  provider: ProviderInfo,
+  env: Record<string, string | number | undefined>,
+): RuntimeProviderConfig['auth'] | null {
+  for (const auth of provider.auth) {
+    const value = String(env[auth.env] ?? '').trim()
+    if (!value) continue
+    return {
+      env: auth.env,
+      type: auth.type,
+      value,
+      name: auth.name,
+    }
+  }
+
+  return null
+}
+
+function pickBaseUrl(
+  provider: ProviderInfo,
+  env: Record<string, string | number | undefined>,
+): string {
+  for (const key of provider.baseUrlEnv) {
+    const value = String(env[key] ?? '').trim()
+    if (value) return value
+  }
+
+  return provider.defaultBaseUrl
+}
+
+function resolveModel(args: {
+  provider: ProviderInfo
+  input: string
+  env: Record<string, string | number | undefined>
+}): ModelInfo {
+  const resolved = resolveSelection({
+    input: args.input,
+    providerId: args.provider.id,
+    env: args.env,
+  })
+  if (resolved) return resolved.model
+
+  const trimmed = args.input.trim()
+  if (!trimmed) {
+    return getDefaultModel(args.provider.id) ?? createUnknownModel(args.provider.id, args.provider.defaultModel)
+  }
+
+  return getModelInfo(trimmed, args.provider.id, args.env) ?? createUnknownModel(args.provider.id, trimmed)
+}
+
+export function describeRuntimeModel(runtime: RuntimeConfig): string {
+  return runtime.modelRef
+}
+
+export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  const [settings, state] = await Promise.all([
+    loadEffectiveSettings(),
+    readProviderState(),
+  ])
+  const sourcePath = `${ONCECODE_PROVIDERS_PATH} or ${ONCECODE_SETTINGS_PATH}`
+  const env = {
+    ...buildStoredEnv(settings, state),
+    ...process.env,
+  }
+  const modelInput = pickModelInput({ env, settings, state })
+  const provider =
+    pickProvider({ env, settings, state, modelInput }) ?? fallbackProvider(env, state)
+
+  if (!modelInput.trim()) {
+    throw new Error(
+      t('config_no_model', {
+        settingsPath: sourcePath,
+      }),
+    )
+  }
+
+  const auth = pickAuth(provider, env)
+  if (!auth) {
+    throw new Error(
+      t('config_no_auth', {
+        settingsPath: sourcePath,
+        provider: provider.name,
+        envs: provider.auth.map(item => item.env).join(' or '),
+      }),
+    )
+  }
+
+  const rawMaxOutputTokens = env.ONCECODE_MAX_OUTPUT_TOKENS ?? settings.maxOutputTokens
+  const parsedMaxOutputTokens = rawMaxOutputTokens === undefined ? NaN : Number(rawMaxOutputTokens)
   const maxOutputTokens =
     Number.isFinite(parsedMaxOutputTokens) && parsedMaxOutputTokens > 0
       ? Math.floor(parsedMaxOutputTokens)
       : undefined
 
-  if (!model) {
-    throw new Error(
-      t('config_no_model', {
-        settingsPath: ONCECODE_SETTINGS_PATH,
-      }),
-    )
-  }
-
-  if (!authToken && !apiKey) {
-    throw new Error(
-      t('config_no_auth', {
-        settingsPath: ONCECODE_SETTINGS_PATH,
-      }),
-    )
-  }
+  const model = resolveModel({
+    provider,
+    input: modelInput || provider.defaultModel,
+    env,
+  })
 
   return {
+    provider: {
+      id: provider.id,
+      name: provider.name,
+      transport: provider.transport,
+      baseUrl: pickBaseUrl(provider, env),
+      auth,
+    },
     model,
-    baseUrl,
-    authToken,
-    apiKey,
+    modelRef: formatModelRef(model),
     maxOutputTokens,
-    mcpServers: effectiveSettings.mcpServers ?? {},
-    sourceSummary: `config: ${ONCECODE_SETTINGS_PATH} > process.env`,
+    mcpServers: settings.mcpServers ?? {},
+    sourceSummary: `config: ${ONCECODE_PROVIDERS_PATH} + ${ONCECODE_SETTINGS_PATH} + process.env`,
   }
 }

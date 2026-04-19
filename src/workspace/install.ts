@@ -5,11 +5,27 @@ import process from 'node:process'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import {
-  ONCECODE_SETTINGS_PATH,
   loadEffectiveSettings,
   saveOnceCodeSettings,
 } from '@/config/runtime.js'
+import {
+  ONCECODE_PROVIDERS_PATH,
+} from '@/config/runtime.js'
+import {
+  readProviderState,
+  saveProviderConnection,
+  setActiveProviderSelection,
+} from '@/config/provider-store.js'
 import { initializeI18n, t } from '@/i18n/index.js'
+import {
+  formatModelRef,
+  getConfiguredProviders,
+  getDefaultModel,
+  getProviderInfo,
+  hydrateCatalog,
+  listProviders,
+  resolveSelection,
+} from '@/provider/catalog.js'
 
 function hasPathEntry(target: string): boolean {
   const pathEntries = (process.env.PATH ?? '').split(':')
@@ -37,6 +53,12 @@ function secretPromptSuffix(secret?: string): string {
   return ' [saved]'
 }
 
+function listProviderChoices(): string {
+  return listProviders()
+    .map(provider => `${provider.id} (${provider.name})`)
+    .join(', ')
+}
+
 async function main(): Promise<void> {
   await initializeI18n('en')
   const rl = readline.createInterface({
@@ -45,6 +67,10 @@ async function main(): Promise<void> {
   })
 
   try {
+    if (!String(process.env.ONCECODE_DISABLE_MODELS_FETCH ?? '').trim()) {
+      await hydrateCatalog().catch(() => {})
+    }
+
     const iterator = rl[Symbol.asyncIterator]()
     const nextLine = async (): Promise<string | null> => {
       const result = await iterator.next()
@@ -52,38 +78,72 @@ async function main(): Promise<void> {
     }
 
     const settings = await loadEffectiveSettings()
+    const state = await readProviderState()
     const currentEnv = settings.env ?? {}
 
     console.log(t('install_title'))
-    console.log(t('install_config_path', { path: ONCECODE_SETTINGS_PATH }))
+    console.log(t('install_config_path', { path: ONCECODE_PROVIDERS_PATH }))
     console.log(t('install_settings_note'))
     console.log('')
+
+    const currentProvider =
+      String(state.activeProvider ?? '').trim() ||
+      String(settings.provider ?? '').trim() ||
+      getConfiguredProviders(currentEnv as NodeJS.ProcessEnv)[0]?.id ||
+      'anthropic'
+    const providerId = await askRequired(
+      nextLine,
+      'Provider',
+      currentProvider,
+    )
+    const provider = getProviderInfo(providerId)
+    if (!provider) {
+      throw new Error(`Unknown provider: ${providerId}. Available: ${listProviderChoices()}`)
+    }
 
     const model = await askRequired(
       nextLine,
       'Model name',
-      settings.model ? String(settings.model) : String(currentEnv.ANTHROPIC_MODEL ?? ''),
+      String(state.activeModel ?? '').trim() ||
+        settings.model ||
+        formatModelRef(getDefaultModel(provider.id) ?? { providerId: provider.id, id: provider.defaultModel }),
     )
+    const resolved = resolveSelection({
+      input: model,
+      providerId: provider.id,
+      env: currentEnv,
+    })
+    const modelRef = resolved ? formatModelRef(resolved.model) : `${provider.id}:${model}`
     const baseUrl = await askRequired(
       nextLine,
-      'ANTHROPIC_BASE_URL',
-      String(currentEnv.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com'),
+      provider.baseUrlEnv[0] ?? 'BASE_URL',
+      String(currentEnv[provider.baseUrlEnv[0] ?? ''] ?? provider.defaultBaseUrl),
     )
-    const savedAuthToken = String(currentEnv.ANTHROPIC_AUTH_TOKEN ?? '')
-    process.stdout.write(`ANTHROPIC_AUTH_TOKEN${secretPromptSuffix(savedAuthToken)}: `)
+    const auth = provider.auth[0]
+    const savedAuthToken = String(currentEnv[auth?.env ?? ''] ?? '')
+    process.stdout.write(`${auth?.env ?? 'API_KEY'}${secretPromptSuffix(savedAuthToken)}: `)
     const tokenInput = ((await nextLine()) ?? '').trim()
     const authToken = tokenInput || savedAuthToken
 
     if (!authToken) {
-      throw new Error(t('install_token_empty'))
+      throw new Error(t('install_token_empty', { env: auth?.env ?? 'API_KEY' }))
     }
 
+    await saveProviderConnection({
+      providerId: provider.id,
+      baseUrl,
+      model: modelRef,
+      vars: {
+        [auth?.env ?? 'API_KEY']: authToken,
+      },
+    })
+    await setActiveProviderSelection({
+      providerId: provider.id,
+      model: modelRef,
+    })
     await saveOnceCodeSettings({
-      model,
       env: {
-        ANTHROPIC_BASE_URL: baseUrl,
-        ANTHROPIC_AUTH_TOKEN: authToken,
-        ANTHROPIC_MODEL: model,
+        [provider.modelEnv[0] ?? 'MODEL']: resolved?.model.api ?? model,
       },
     })
 
@@ -103,7 +163,7 @@ async function main(): Promise<void> {
 
     console.log('')
     console.log(t('install_complete'))
-    console.log(t('install_config_file', { path: ONCECODE_SETTINGS_PATH }))
+    console.log(t('install_config_file', { path: ONCECODE_PROVIDERS_PATH }))
     console.log(t('install_launch_command', { path: launcherPath }))
 
     if (!hasPathEntry(targetBinDir)) {

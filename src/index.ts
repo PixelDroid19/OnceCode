@@ -1,6 +1,6 @@
 import readline from 'node:readline'
 import process from 'node:process'
-import { AnthropicModelAdapter } from './agent/anthropic-adapter.js'
+import { createModelAdapter } from './agent/factory.js'
 import {
   completeSlashCommand,
   findMatchingSlashCommands,
@@ -15,6 +15,7 @@ import { maybeHandleManagementCommand } from './commands/manage.js'
 import { summarizeMcpServers } from './mcp/status.js'
 import { MockModelAdapter } from './agent/mock-model.js'
 import { PermissionManager } from './permissions/manager.js'
+import { hydrateCatalog } from './provider/catalog.js'
 import { buildSystemPrompt } from './session/prompt.js'
 import { refreshSystemPrompt } from './session/system-prompt.js'
 import { createDefaultToolRegistry, hydrateMcpTools } from './tools/index.js'
@@ -43,6 +44,8 @@ async function main(): Promise<void> {
       return
     }
 
+    await hydrateCatalog().catch(() => {})
+
     const isInteractiveTerminal = Boolean(process.stdin.isTTY && process.stdout.isTTY)
     let runtime = null
     try {
@@ -67,7 +70,7 @@ async function main(): Promise<void> {
     const model =
       process.env.ONCECODE_MODEL_MODE === 'mock'
         ? new MockModelAdapter()
-        : new AnthropicModelAdapter(tools, loadRuntimeConfig)
+        : createModelAdapter(tools, loadRuntimeConfig)
     let messages: ChatMessage[] = [
       {
         role: 'system',
@@ -137,6 +140,11 @@ async function main(): Promise<void> {
           const localCommandResult = await tryHandleLocalCommand(input, {
             tools,
             contextTracker,
+            runtime,
+            async onRuntimeChange(next) {
+              runtime = next
+              contextTracker.setModel(next.model, next.maxOutputTokens)
+            },
           })
           if (localCommandResult !== null) {
             console.log(`\n${localCommandResult}\n`)

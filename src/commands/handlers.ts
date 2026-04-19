@@ -1,10 +1,18 @@
 import {
+  ONCECODE_PROVIDERS_PATH,
   ONCECODE_MCP_PATH,
   ONCECODE_PERMISSIONS_PATH,
   ONCECODE_SETTINGS_PATH,
+  describeRuntimeModel,
   loadRuntimeConfig,
   saveOnceCodeSettings,
+  type RuntimeConfig,
 } from '@/config/runtime.js'
+import {
+  readProviderState,
+  saveProviderConnection,
+  setActiveProviderSelection,
+} from '@/config/provider-store.js'
 import type { ContextTracker } from '@/context/tracker.js'
 import {
   getCurrentLanguageLabel,
@@ -18,6 +26,13 @@ import {
   type LanguageSetting,
   resolveLanguage,
 } from '@/i18n/languages.js'
+import {
+  formatModelRef,
+  getProviderInfo,
+  listModels,
+  resolveSelection,
+  type ModelInfo,
+} from '@/provider/catalog.js'
 import type { ToolRegistry } from '@/tools/framework.js'
 
 /** Definition of a user-facing slash command available in the REPL. */
@@ -58,6 +73,16 @@ const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
     name: '/model',
     usage: '/model <model-name>',
     descriptionKey: 'cmd_model_set_desc',
+  },
+  {
+    name: '/connect',
+    usage: '/connect',
+    descriptionKey: 'cmd_connect_desc',
+  },
+  {
+    name: '/providers',
+    usage: '/providers',
+    descriptionKey: 'cmd_providers_desc',
   },
   {
     name: '/config-paths',
@@ -206,12 +231,103 @@ async function handleLanguageCommand(input: string): Promise<string> {
   })
 }
 
+function formatModelChoices(models: ModelInfo[]): string {
+  return models
+    .slice(0, 24)
+    .map(model => `- ${formatModelRef(model)}  ${model.name}`)
+    .join('\n')
+}
+
+async function formatProviders(runtime: RuntimeConfig): Promise<string> {
+  const state = await readProviderState()
+  const ids = [...new Set(
+    Object.values(state.providers ?? {})
+      .map(item => item.providerId.trim())
+      .filter(Boolean),
+  )].sort((a, b) => a.localeCompare(b))
+
+  return [
+    t('config_provider', { provider: runtime.provider?.name ?? 'custom' }),
+    t('config_model', { model: describeRuntimeModel(runtime) }),
+    t('config_connected_providers', { count: ids.length }),
+    ids.length > 0
+      ? ids
+          .map(id => `- ${id}${id === runtime.provider.id ? ' *' : ''}  ${getProviderInfo(id)?.name ?? id}`)
+          .join('\n')
+      : t('config_no_connected_providers'),
+    t('config_providers_path', { path: ONCECODE_PROVIDERS_PATH }),
+  ].join('\n')
+}
+
+async function handleModelCommand(args: {
+  input: string
+  runtime?: RuntimeConfig | null
+  onRuntimeChange?: (runtime: RuntimeConfig) => Promise<void> | void
+}): Promise<string> {
+  if (args.input === '/model') {
+    const runtime = args.runtime ?? await loadRuntimeConfig()
+    return [
+      t('config_current_model', { model: describeRuntimeModel(runtime) }),
+      t('config_provider', { provider: runtime.provider?.name ?? 'custom' }),
+    ].join('\n')
+  }
+
+  const raw = args.input.slice('/model '.length).trim()
+  if (!raw) {
+    return t('config_model_usage')
+  }
+
+  const runtime = args.runtime ?? await loadRuntimeConfig().then(
+    value => value,
+    () => null,
+  )
+  const provider = runtime?.provider.id ? getProviderInfo(runtime.provider.id) : null
+  const typed = raw.includes(':') ? raw : provider?.id ? `${provider.id}:${raw}` : raw
+  const resolved = resolveSelection({
+    input: typed,
+    providerId: provider?.id,
+    env: {
+      ...(process.env as Record<string, string | undefined>),
+    },
+  })
+
+  if (!resolved) {
+    const hint = provider ? formatModelChoices(listModels(provider.id)) : formatModelChoices(listModels())
+    return [
+      t('config_model_invalid', { model: raw }),
+      hint,
+    ].filter(Boolean).join('\n')
+  }
+
+  const ref = formatModelRef(resolved.model)
+  await setActiveProviderSelection({
+    providerId: resolved.provider.id,
+    model: ref,
+  })
+  if ((await readProviderState()).providers?.[resolved.provider.id]) {
+    await saveProviderConnection({
+      providerId: resolved.provider.id,
+      model: ref,
+      activate: false,
+    })
+  }
+  const next = await loadRuntimeConfig()
+  await args.onRuntimeChange?.(next)
+  const saved = raw.includes(':') ? describeRuntimeModel(next) : raw
+  return t('config_model_saved', {
+    model: saved,
+    path: ONCECODE_PROVIDERS_PATH,
+  })
+}
+
 /** Attempts to handle a slash command locally; returns null if the input is not a recognized command. */
 export async function tryHandleLocalCommand(
   input: string,
   context?: {
     tools?: ToolRegistry
     contextTracker?: ContextTracker
+    runtime?: RuntimeConfig | null
+    onRuntimeChange?: (runtime: RuntimeConfig) => Promise<void> | void
   },
 ): Promise<string | null> {
   if (input === '/' || input === '/help') {
@@ -221,9 +337,19 @@ export async function tryHandleLocalCommand(
   if (input === '/config-paths') {
     return [
       t('config_settings_path', { path: ONCECODE_SETTINGS_PATH }),
+      t('config_providers_path', { path: ONCECODE_PROVIDERS_PATH }),
       t('config_permissions_path', { path: ONCECODE_PERMISSIONS_PATH }),
       t('config_mcp_path', { path: ONCECODE_MCP_PATH }),
     ].join('\n')
+  }
+
+  if (input === '/providers') {
+    const runtime = context?.runtime ?? await loadRuntimeConfig()
+    return formatProviders(runtime)
+  }
+
+  if (input === '/connect') {
+    return t('config_connect_tty')
   }
 
   if (input === '/permissions') {
@@ -270,14 +396,13 @@ export async function tryHandleLocalCommand(
   }
 
   if (input === '/status') {
-    const runtime = await loadRuntimeConfig()
+    const runtime = context?.runtime ?? await loadRuntimeConfig()
     return [
-      t('config_model', { model: runtime.model }),
-      t('config_base_url', { baseUrl: runtime.baseUrl }),
+      t('config_model', { model: describeRuntimeModel(runtime) }),
+      t('config_provider', { provider: runtime.provider?.name ?? 'custom' }),
+      t('config_base_url', { baseUrl: runtime.provider?.baseUrl ?? String((runtime as RuntimeConfig & { baseUrl?: string }).baseUrl ?? '') }),
       t('config_auth', {
-        auth: runtime.authToken
-          ? 'ANTHROPIC_AUTH_TOKEN'
-          : 'ANTHROPIC_API_KEY',
+        auth: runtime.provider?.auth.env ?? 'unknown',
       }),
       t('config_mcp_count', {
         count: Object.keys(runtime.mcpServers).length,
@@ -286,21 +411,11 @@ export async function tryHandleLocalCommand(
     ].join('\n')
   }
 
-  if (input === '/model') {
-    const runtime = await loadRuntimeConfig()
-    return t('config_current_model', { model: runtime.model })
-  }
-
-  if (input.startsWith('/model ')) {
-    const model = input.slice('/model '.length).trim()
-    if (!model) {
-      return t('config_model_usage')
-    }
-
-    await saveOnceCodeSettings({ model })
-    return t('config_model_saved', {
-      model,
-      path: ONCECODE_SETTINGS_PATH,
+  if (input === '/model' || input.startsWith('/model ')) {
+    return handleModelCommand({
+      input,
+      runtime: context?.runtime,
+      onRuntimeChange: context?.onRuntimeChange,
     })
   }
 

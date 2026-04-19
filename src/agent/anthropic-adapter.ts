@@ -2,6 +2,7 @@ import type { ToolRegistry } from '@/tools/framework.js'
 import type { ChatMessage, ModelAdapter, ModelRequestOptions, AgentStep, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
+import { formatAssistantText, parseAssistantText } from '@/agent/assistant-text.js'
 import {
   extractErrorMessage,
   parseRetryAfterMs,
@@ -16,6 +17,42 @@ import {
   exponentialRetrySchedule,
   withRetry,
 } from '@/utils/result.js'
+
+function getBaseUrl(runtime: RuntimeConfig): string {
+  return runtime.provider?.baseUrl ?? (runtime as RuntimeConfig & { baseUrl?: string }).baseUrl ?? 'https://api.anthropic.com'
+}
+
+function getAuth(runtime: RuntimeConfig): { type: 'bearer' | 'header'; value: string; name?: string } | null {
+  if (runtime.provider?.auth) {
+    if (runtime.provider.auth.type === 'query') {
+      return null
+    }
+    return {
+      type: runtime.provider.auth.type,
+      value: runtime.provider.auth.value,
+      name: runtime.provider.auth.name,
+    }
+  }
+
+  const legacy = runtime as RuntimeConfig & {
+    authToken?: string
+    apiKey?: string
+  }
+  if (legacy.authToken) {
+    return {
+      type: 'bearer',
+      value: legacy.authToken,
+    }
+  }
+  if (legacy.apiKey) {
+    return {
+      type: 'header',
+      name: 'x-api-key',
+      value: legacy.apiKey,
+    }
+  }
+  return null
+}
 
 const DEFAULT_MAX_RETRIES = 4
 
@@ -71,42 +108,6 @@ function isToolUseBlock(block: AnthropicContentBlock): block is Extract<Anthropi
   )
 }
 
-function parseAssistantText(content: string): {
-  content: string
-  kind?: 'final' | 'progress'
-} {
-  const trimmed = content.trim()
-  if (!trimmed) {
-    return { content: '' }
-  }
-
-  const markers: Array<{
-    prefix: string
-    kind: 'final' | 'progress'
-  }> = [
-    { prefix: '<final>', kind: 'final' },
-    { prefix: '[FINAL]', kind: 'final' },
-    { prefix: '<progress>', kind: 'progress' },
-    { prefix: '[PROGRESS]', kind: 'progress' },
-  ]
-
-  for (const marker of markers) {
-    if (trimmed.startsWith(marker.prefix)) {
-      const rawContent = trimmed.slice(marker.prefix.length).trim()
-      const closingTag =
-        marker.kind === 'progress'
-          ? /<\/progress>/gi
-          : /<\/final>/gi
-      return {
-        content: rawContent.replace(closingTag, '').trim(),
-        kind: marker.kind,
-      }
-    }
-  }
-
-  return { content: trimmed }
-}
-
 function toTextBlock(text: string): AnthropicContentBlock {
   return { type: 'text', text }
 }
@@ -114,11 +115,7 @@ function toTextBlock(text: string): AnthropicContentBlock {
 function toAssistantText(message: Extract<ChatMessage, {
   role: 'assistant' | 'assistant_progress'
 }>): string {
-  if (message.role === 'assistant_progress') {
-    return `<progress>\n${message.content}\n</progress>`
-  }
-
-  return message.content
+  return formatAssistantText(message)
 }
 
 function pushAnthropicMessage(
@@ -193,7 +190,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
   async next(messages: ChatMessage[], options?: ModelRequestOptions) {
     const runtime = await this.getRuntimeConfig()
     const payload = toAnthropicMessages(messages)
-    const url = `${runtime.baseUrl.replace(/\/$/, '')}/v1/messages`
+    const url = `${getBaseUrl(runtime).replace(/\/$/, '')}/v1/messages`
     const maxOutputTokens = options?.maxOutputTokens ?? resolveMaxOutputTokens(
       runtime.model,
       runtime.maxOutputTokens,
@@ -204,15 +201,18 @@ export class AnthropicModelAdapter implements ModelAdapter {
       'anthropic-version': '2023-06-01',
     }
 
-    if (runtime.authToken) {
-      headers.Authorization = `Bearer ${runtime.authToken}`
-    } else if (runtime.apiKey) {
-      headers['x-api-key'] = runtime.apiKey
+    const auth = getAuth(runtime)
+    if (auth?.type === 'bearer') {
+      headers.Authorization = `Bearer ${auth.value}`
+    }
+
+    if (auth?.type === 'header' && auth.name) {
+      headers[auth.name] = auth.value
     }
 
     const includeTools = options?.includeTools !== false
     const requestBody: Record<string, unknown> = {
-      model: runtime.model,
+      model: runtime.model.api,
       system: payload.system,
       messages: payload.messages,
       max_tokens: maxOutputTokens,

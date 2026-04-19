@@ -6,6 +6,17 @@ import {
   tryHandleLocalCommand,
 } from '@/commands/handlers.js'
 import { compactConversation } from '@/context/compaction.js'
+import { loadRuntimeConfig } from '@/config/runtime.js'
+import {
+  readProviderState,
+  saveProviderConnection,
+} from '@/config/provider-store.js'
+import {
+  formatModelRef,
+  getProviderInfo,
+  listModels,
+  listProviders,
+} from '@/provider/catalog.js'
 import { loadHistoryEntries, saveHistoryEntries } from '@/session/history.js'
 import { parseLocalToolShortcut } from '@/commands/shortcuts.js'
 import { summarizeMcpServers } from '@/mcp/status.js'
@@ -29,7 +40,12 @@ import {
   showCursor,
 } from '@/tui/index.js'
 
-import type { TtyAppArgs, ScreenState, AggregatedEditProgress } from './types.js'
+import type {
+  TtyAppArgs,
+  ScreenState,
+  AggregatedEditProgress,
+  ConnectDialog,
+} from './types.js'
 import {
   pushTranscriptEntry,
   updateTranscriptEntry,
@@ -62,6 +78,174 @@ import { withScope } from '@/utils/scope.js'
 
 export type { TtyAppArgs }
 
+function visible(dialog: ConnectDialog): string[] {
+  if (!dialog.query.trim()) return dialog.ids
+
+  const query = dialog.query.trim().toLowerCase()
+  const ids = dialog.step === 'model'
+    ? listModels(dialog.pid ?? undefined).map(item => item.ref)
+    : dialog.ids
+
+  return ids.filter(id => id.toLowerCase().includes(query))
+}
+
+function pick(dialog: ConnectDialog): string | null {
+  const ids = visible(dialog)
+  if (ids.length === 0) return null
+  return ids[Math.min(dialog.idx, ids.length - 1)] ?? null
+}
+
+async function openConnectDialog(
+  args: TtyAppArgs,
+  state: ScreenState,
+): Promise<void> {
+  const saved = await readProviderState()
+  const ids = listProviders().map(item => item.id)
+  state.providerDialog = {
+    step: 'provider',
+    ids,
+    map: saved.providers ?? {},
+    idx: 0,
+    pid: null,
+    auth: 0,
+    token: '',
+    base: '',
+    query: '',
+    active: args.runtime?.provider.id ?? saved.activeProvider ?? null,
+    note: null,
+  }
+  state.status = t('ui_connecting_provider')
+}
+
+function renderConnectDialog(dialog: ConnectDialog): string {
+  if (dialog.step === 'token') {
+    return [
+      'Enter API key or token.',
+      '',
+      `provider: ${dialog.pid}`,
+      `token: ${dialog.token ? '*'.repeat(Math.min(dialog.token.length, 24)) : ''}`,
+      '',
+      'Enter save | Esc cancel',
+    ].join('\n')
+  }
+
+  if (dialog.step === 'base') {
+    return [
+      'Enter base URL or leave blank for default.',
+      '',
+      `provider: ${dialog.pid}`,
+      `baseUrl: ${dialog.base}`,
+      '',
+      'Enter continue | Esc cancel',
+    ].join('\n')
+  }
+
+  const ids = visible(dialog)
+  const rows = ids.slice(Math.max(0, dialog.idx - 8), Math.max(0, dialog.idx - 8) + 16)
+
+  return [
+    dialog.step === 'provider'
+      ? 'Select a provider to connect.'
+      : dialog.step === 'auth'
+        ? 'Select an auth method.'
+        : 'Select a model for this provider.',
+    dialog.note ?? '',
+    dialog.query ? `filter: ${dialog.query}` : '',
+    '',
+    ...rows.map(id => {
+      const selected = id === pick(dialog)
+      const label = dialog.step === 'model'
+        ? `${id}${id === dialog.active ? ' *' : ''}`
+        : `${id}${dialog.map[id] ? ' [saved]' : ''}${id === dialog.active ? ' *' : ''}`
+      return `${selected ? '>' : ' '} ${label}`
+    }),
+    '',
+    'Up/Down move | Type filter | Enter select | Esc cancel',
+  ].filter(Boolean).join('\n')
+}
+
+async function submitConnectDialog(
+  args: TtyAppArgs,
+  state: ScreenState,
+): Promise<void> {
+  const dialog = state.providerDialog
+  if (!dialog) return
+
+  if (dialog.step === 'provider') {
+    const id = pick(dialog)
+    if (!id) return
+    const provider = getProviderInfo(id)
+    if (!provider) return
+    dialog.pid = id
+    dialog.idx = 0
+    dialog.query = ''
+    dialog.auth = 0
+    dialog.base = dialog.map[id]?.baseUrl ?? provider.defaultBaseUrl
+    dialog.token = ''
+    dialog.step = provider.auth.length > 1 ? 'auth' : 'token'
+    return
+  }
+
+  if (dialog.step === 'auth') {
+    dialog.auth = Math.min(dialog.idx, (getProviderInfo(dialog.pid ?? '')?.auth.length ?? 1) - 1)
+    dialog.idx = 0
+    dialog.query = ''
+    dialog.step = 'token'
+    return
+  }
+
+  if (dialog.step === 'token') {
+    dialog.step = 'base'
+    return
+  }
+
+  if (dialog.step === 'base') {
+    dialog.ids = listModels(dialog.pid ?? undefined).map(item => item.ref)
+    dialog.idx = 0
+    dialog.query = ''
+    dialog.step = 'model'
+    return
+  }
+
+  const ref = pick(dialog)
+  const provider = getProviderInfo(dialog.pid ?? '')
+  if (!ref || !provider) return
+  const auth = provider.auth[Math.min(dialog.auth, provider.auth.length - 1)]
+  const token = dialog.token.trim() || dialog.map[provider.id]?.vars?.[auth?.env ?? ''] || ''
+  if (!auth || !token) {
+    dialog.note = t('install_token_empty', { env: auth?.env ?? 'API_KEY' })
+    dialog.step = 'token'
+    return
+  }
+
+  await saveProviderConnection({
+    providerId: provider.id,
+    vars: { [auth.env]: token },
+    baseUrl: dialog.base.trim() || provider.defaultBaseUrl,
+    model: ref,
+  })
+  const next = await loadRuntimeConfig()
+  args.runtime = next
+  args.contextTracker.setModel(next.model, next.maxOutputTokens)
+  state.providerDialog = null
+  state.status = null
+  pushTranscriptEntry(state, {
+    kind: 'assistant',
+    body: `${provider.name} connected\n${formatModelRef(next.model)}`,
+  })
+}
+
+function moveConnectDialog(state: ScreenState, delta: number): boolean {
+  const dialog = state.providerDialog
+  if (!dialog || dialog.step === 'token' || dialog.step === 'base') return false
+  const ids = visible(dialog)
+  if (ids.length === 0) return false
+  const next = Math.max(0, Math.min(ids.length - 1, dialog.idx + delta))
+  if (next === dialog.idx) return false
+  dialog.idx = next
+  return true
+}
+
 function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const backgroundTasks = listBackgroundTasks()
   clearScreen()
@@ -78,6 +262,23 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
         feedbackInput: state.pendingApproval.feedbackInput,
       })),
     )
+    console.log('')
+    console.log(renderPanel(t('ui_panel_activity'), renderToolPanel(state.activeTool, state.recentTools, backgroundTasks)))
+    console.log('')
+    console.log(
+      renderFooterBar(
+        state.status,
+        true,
+        args.tools.getSkills().length > 0,
+        summarizeMcpServers(args.tools.getMcpServers()),
+        backgroundTasks,
+      ),
+    )
+    return
+  }
+
+  if (state.providerDialog) {
+    console.log(renderPanel(t('ui_panel_connect'), renderConnectDialog(state.providerDialog)))
     console.log('')
     console.log(renderPanel(t('ui_panel_activity'), renderToolPanel(state.activeTool, state.recentTools, backgroundTasks)))
     console.log('')
@@ -211,6 +412,11 @@ async function handleInput(
     return false
   }
 
+  if (input === '/connect') {
+    await openConnectDialog(args, state)
+    return false
+  }
+
   // Manual compaction via /compact
   if (input === '/compact') {
     state.isBusy = true
@@ -252,6 +458,11 @@ async function handleInput(
   const localCommandResult = await tryHandleLocalCommand(input, {
     tools: args.tools,
     contextTracker: args.contextTracker,
+    runtime: args.runtime,
+    async onRuntimeChange(next) {
+      args.runtime = next
+      args.contextTracker.setModel(next.model, next.maxOutputTokens)
+    },
   })
   if (localCommandResult !== null) {
     pushTranscriptEntry(state, {
@@ -733,6 +944,73 @@ function handleNormalEvent(
   finish: () => void,
   submitInput: (input: string) => void,
 ): void {
+  if (state.providerDialog) {
+    const dialog = state.providerDialog
+
+    if (event.kind === 'text' && event.ctrl && event.text === 'c') {
+      finish()
+      return
+    }
+
+    if (event.kind === 'key' && event.name === 'escape') {
+      state.providerDialog = null
+      state.status = null
+      rerender()
+      return
+    }
+
+    if (event.kind === 'key' && event.name === 'up') {
+      if (moveConnectDialog(state, -1)) rerender()
+      return
+    }
+
+    if (event.kind === 'key' && event.name === 'down') {
+      if (moveConnectDialog(state, 1)) rerender()
+      return
+    }
+
+    if (event.kind === 'key' && event.name === 'backspace') {
+      if (dialog.step === 'token' && dialog.token.length > 0) {
+        dialog.token = dialog.token.slice(0, -1)
+        rerender()
+      }
+      if (dialog.step === 'base' && dialog.base.length > 0) {
+        dialog.base = dialog.base.slice(0, -1)
+        rerender()
+      }
+      if ((dialog.step === 'provider' || dialog.step === 'auth' || dialog.step === 'model') && dialog.query.length > 0) {
+        dialog.query = dialog.query.slice(0, -1)
+        dialog.idx = 0
+        rerender()
+      }
+      return
+    }
+
+    if (event.kind === 'key' && event.name === 'return') {
+      void submitConnectDialog(args, state).then(rerender)
+      return
+    }
+
+    if (event.kind === 'text' && !event.ctrl && !event.meta) {
+      if (dialog.step === 'token') {
+        dialog.token += event.text
+        rerender()
+        return
+      }
+      if (dialog.step === 'base') {
+        dialog.base += event.text
+        rerender()
+        return
+      }
+      dialog.query += event.text
+      dialog.idx = 0
+      rerender()
+      return
+    }
+
+    return
+  }
+
   const visibleCommands = getVisibleCommands(state.input)
 
   if (event.kind === 'text' && event.ctrl && event.text === 'c') {
@@ -976,6 +1254,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
       historyDraft: '',
       nextEntryId: 1,
       pendingApproval: null,
+      providerDialog: null,
       isBusy: false,
       turnController: null,
       streamingAssistantEntryId: null,

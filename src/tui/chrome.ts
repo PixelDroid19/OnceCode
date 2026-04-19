@@ -6,6 +6,7 @@ import type { ContextWarningLevel } from '@/context/tracker.js'
 import type { SlashCommand } from '@/commands/handlers.js'
 import { APP_NAME } from '@/constants.js'
 import { t } from '@/i18n/index.js'
+import { describeRuntimeModel } from '@/config/runtime.js'
 import type { PermissionRequest } from '@/permissions/manager.js'
 import {
   COLLAPSED_DETAIL_LIMIT,
@@ -31,6 +32,22 @@ const BRIGHT_RED = '\u001b[91m'
 const BRIGHT_CYAN = '\u001b[96m'
 const BRIGHT_YELLOW = '\u001b[93m'
 const BORDER = '\u001b[38;5;31m'
+
+function getProvider(runtime: RuntimeConfig | null): string {
+  if (!runtime) {
+    return t('ui_status_offline')
+  }
+
+  return runtime.provider?.name ?? 'custom'
+}
+
+function getModel(runtime: RuntimeConfig | null): string {
+  if (!runtime) {
+    return t('ui_status_not_configured')
+  }
+
+  return runtime.provider ? describeRuntimeModel(runtime) : String((runtime as RuntimeConfig & { model?: string }).model ?? t('ui_status_not_configured'))
+}
 
 function stripAnsi(input: string): string {
   return input.replace(/\u001b\[[0-9;]*m/g, '')
@@ -261,10 +278,8 @@ export function renderBanner(
   const panelWidth = Math.max(MIN_TERMINAL_WIDTH, process.stdout.columns ?? DEFAULT_TERMINAL_COLS)
   const panelInner = Math.max(0, panelWidth - 4)
   const cwdName = path.basename(cwd) || cwd
-  const model = runtime?.model ?? t('ui_status_not_configured')
-  const provider = runtime?.baseUrl
-    ? runtime.baseUrl.replace(/^https?:\/\//, '').split('/')[0] || 'custom'
-    : t('ui_status_offline')
+  const model = getModel(runtime)
+  const provider = getProvider(runtime)
   const pathBudget = Math.max(20, panelInner - 28)
   const projectLine = `${BLUE}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
   const permissionLine =

@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from '@/config/runtime.js'
+import type { ProviderConnection } from '@/config/provider-store.js'
 import type { ContextTracker } from '@/context/tracker.js'
 import type { ToolRegistry } from '@/tools/framework.js'
 import type { ChatMessage, ModelAdapter } from '@/types.js'
@@ -27,6 +28,20 @@ export type PendingApproval = {
   feedbackInput: string
 }
 
+export type ConnectDialog = {
+  step: 'provider' | 'auth' | 'token' | 'base' | 'model'
+  ids: string[]
+  map: Record<string, ProviderConnection>
+  idx: number
+  pid: string | null
+  auth: number
+  token: string
+  base: string
+  query: string
+  active: string | null
+  note: string | null
+}
+
 /** Mutable state driving the TTY screen rendering loop. */
 export type ScreenState = {
   input: string
@@ -42,6 +57,7 @@ export type ScreenState = {
   historyDraft: string
   nextEntryId: number
   pendingApproval: PendingApproval | null
+  providerDialog: ConnectDialog | null
   isBusy: boolean
   turnController: AbortController | null
   streamingAssistantEntryId: number | null

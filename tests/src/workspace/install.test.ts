@@ -21,7 +21,7 @@ describe('install entrypoint', () => {
     const result = await runTsxEntry({
       cwd,
       entry: 'src/workspace/install.ts',
-      stdin: 'demo-model\nhttps://api.example.com\nsecret-token\n',
+      stdin: 'anthropic\ndemo-model\nhttps://api.example.com\nsecret-token\n',
       env: {
         HOME: homeDir,
         PATH: process.env.PATH,
@@ -33,13 +33,16 @@ describe('install entrypoint', () => {
     expect(result.stdout).toContain('Installation complete.')
 
     const settingsPath = path.join(homeDir, '.oncecode', 'settings.json')
+    const providersPath = path.join(homeDir, '.oncecode', 'providers.json')
     const launcherPath = path.join(homeDir, '.local', 'bin', 'oncecode')
     const settings = await readFile(settingsPath, 'utf8')
+    const providers = await readFile(providersPath, 'utf8')
     const launcher = await readFile(launcherPath, 'utf8')
 
     expect(settings).toContain('demo-model')
-    expect(settings).toContain('https://api.example.com')
-    expect(settings).toContain('secret-token')
+    expect(providers).toContain('anthropic:demo-model')
+    expect(providers).toContain('https://api.example.com')
+    expect(providers).toContain('secret-token')
     expect(launcher).toContain('bin/oncecode')
   })
 })

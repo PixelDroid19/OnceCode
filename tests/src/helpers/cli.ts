@@ -17,6 +17,8 @@ export async function runTsxEntry(args: {
         cwd: args.cwd,
         env: {
           ...process.env,
+          ONCECODE_DISABLE_MODELS_FETCH:
+            args.env?.ONCECODE_DISABLE_MODELS_FETCH ?? '1',
           ...(args.env ?? {}),
         },
         stdio: 'pipe',

@@ -51,11 +51,47 @@ describe('config', () => {
     )
     const runtime = await config.loadRuntimeConfig()
 
-    expect(runtime.model).toBe('once-model')
-    expect(runtime.baseUrl).toBe('https://api.example.com')
-    expect(runtime.authToken).toBe('env-token')
+    expect(runtime.model.id).toBe('once-model')
+    expect(runtime.modelRef).toBe('anthropic:once-model')
+    expect(runtime.provider.baseUrl).toBe('https://api.example.com')
+    expect(runtime.provider.auth.value).toBe('env-token')
     expect(runtime.maxOutputTokens).toBe(2048)
     expect(Object.keys(runtime.mcpServers).sort()).toEqual(['globalFs', 'projectFs'])
+  })
+
+  it('prefers provider connections from providers.json', async () => {
+    homeDir = await makeTempDir('oncecode-home')
+    cwdDir = await makeTempDir('oncecode-project')
+    setEnv({ HOME: homeDir, ANTHROPIC_AUTH_TOKEN: undefined, OPENAI_API_KEY: undefined })
+    process.chdir(cwdDir)
+
+    const oncecodeDir = path.join(homeDir, '.oncecode')
+    await mkdir(oncecodeDir, { recursive: true })
+    await writeFile(
+      path.join(oncecodeDir, 'providers.json'),
+      JSON.stringify({
+        activeProvider: 'openai',
+        activeModel: 'openai:gpt-4o',
+        providers: {
+          openai: {
+            providerId: 'openai',
+            vars: { OPENAI_API_KEY: 'store-token' },
+            baseUrl: 'https://api.openai.example/v1',
+            model: 'openai:gpt-4o',
+          },
+        },
+      }),
+    )
+
+    const config = await importFresh<typeof import('@/config/runtime.js')>(
+      '@/config/runtime.js', import.meta.url,
+    )
+    const runtime = await config.loadRuntimeConfig()
+
+    expect(runtime.provider.id).toBe('openai')
+    expect(runtime.provider.baseUrl).toBe('https://api.openai.example/v1')
+    expect(runtime.provider.auth.value).toBe('store-token')
+    expect(runtime.modelRef).toBe('openai:gpt-4o')
   })
 
   it('throws when auth is missing', async () => {
@@ -72,7 +108,7 @@ describe('config', () => {
     const config = await importFresh<typeof import('@/config/runtime.js')>(
       '@/config/runtime.js', import.meta.url,
     )
-    await expect(config.loadRuntimeConfig()).rejects.toThrow('No auth configured')
+    await expect(config.loadRuntimeConfig()).rejects.toThrow('No auth configured for Anthropic')
   })
 
   it('reads and writes MCP token files', async () => {

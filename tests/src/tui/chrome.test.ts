@@ -53,7 +53,42 @@ describe('tui/chrome', () => {
   it('renders the OnceCode banner content', () => {
     setTerminalSize(160)
     const rendered = stripAnsi(renderBanner(
-      { model: 'demo', baseUrl: 'https://example.com', mcpServers: {}, sourceSummary: 'test' },
+      {
+        provider: {
+          id: 'anthropic',
+          name: 'Anthropic',
+          transport: 'anthropic',
+          baseUrl: 'https://example.com',
+          auth: {
+            env: 'ANTHROPIC_AUTH_TOKEN',
+            type: 'bearer',
+            value: 'token',
+          },
+        },
+        model: {
+          id: 'demo',
+          ref: 'anthropic:demo',
+          name: 'demo',
+          api: 'demo',
+          providerId: 'anthropic',
+          aliases: [],
+          defaultOutput: 32_000,
+          limits: { context: 200_000, output: 64_000 },
+          capabilities: {
+            attachment: true,
+            reasoning: false,
+            temperature: true,
+            toolCall: true,
+            interleaved: false,
+            input: { text: true, audio: false, image: true, video: false, pdf: true },
+            output: { text: true, audio: false, image: false, video: false, pdf: false },
+          },
+          known: false,
+        },
+        modelRef: 'anthropic:demo',
+        mcpServers: {},
+        sourceSummary: 'test',
+      },
       '/tmp/project',
       ['cwd: /tmp/project'],
       {

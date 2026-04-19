@@ -22,9 +22,38 @@ describe('anthropic-adapter', () => {
     ])
 
     return new AnthropicModelAdapter(tools, async () => ({
-      model: 'claude-3-5-sonnet',
-      baseUrl: 'https://api.example.com',
-      authToken: 'token',
+      provider: {
+        id: 'anthropic',
+        name: 'Anthropic',
+        transport: 'anthropic',
+        baseUrl: 'https://api.example.com',
+        auth: {
+          env: 'ANTHROPIC_AUTH_TOKEN',
+          type: 'bearer',
+          value: 'token',
+        },
+      },
+      model: {
+        id: 'claude-3-5-sonnet',
+        ref: 'anthropic:claude-3-5-sonnet',
+        name: 'Claude 3.5 Sonnet',
+        api: 'claude-3-5-sonnet',
+        providerId: 'anthropic',
+        aliases: [],
+        defaultOutput: 8_192,
+        limits: { context: 200_000, output: 8_192 },
+        capabilities: {
+          attachment: true,
+          reasoning: true,
+          temperature: true,
+          toolCall: true,
+          interleaved: false,
+          input: { text: true, audio: false, image: true, video: false, pdf: true },
+          output: { text: true, audio: false, image: false, video: false, pdf: false },
+        },
+        known: true,
+      },
+      modelRef: 'anthropic:claude-3-5-sonnet',
       maxOutputTokens: 999999,
       mcpServers: {},
       sourceSummary: 'test',
