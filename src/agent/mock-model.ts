@@ -1,3 +1,11 @@
+/**
+ * Mock model adapter for testing and offline development.
+ *
+ * Responds to slash-command prefixed messages (`/ls`, `/read`, `/grep`, etc.)
+ * by emitting the corresponding tool calls, letting tests exercise the full
+ * agent loop without hitting a real API.
+ */
+
 import type { AgentStep, ChatMessage, ModelAdapter, ModelRequestOptions } from '@/types.js'
 import { t } from '@/i18n/index.js'
 import { estimateMessagesTokenCount } from '@/context/window.js'

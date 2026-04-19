@@ -1,3 +1,12 @@
+/**
+ * Agent turn loop.
+ *
+ * Drives a model adapter in a loop — calling `next()`, executing any
+ * returned tool calls (with parallel batching for read-only tools),
+ * and continuing until the model produces a final assistant response
+ * or the step limit is reached.
+ */
+
 import type { ToolRegistry, ToolResult } from '@/tools/framework.js'
 import type { ChatMessage, ModelAdapter, TokenUsage, ToolCall } from '@/types.js'
 import type { PermissionManager } from '@/permissions/manager.js'

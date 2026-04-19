@@ -1,3 +1,14 @@
+/**
+ * Assistant text parsing and formatting.
+ *
+ * Handles `<progress>`/`<final>` marker tags that the model uses to signal
+ * whether a response is an intermediate status update or a completed answer.
+ */
+
+/**
+ * Parses raw assistant text, detecting `<progress>`, `<final>`, `[PROGRESS]`,
+ * or `[FINAL]` markers and stripping them from the returned content.
+ */
 export function parseAssistantText(content: string): {
   content: string
   kind?: 'final' | 'progress'
@@ -31,6 +42,7 @@ export function parseAssistantText(content: string): {
   return { content: trimmed }
 }
 
+/** Wraps `assistant_progress` messages in `<progress>` tags for round-tripping. */
 export function formatAssistantText(message: {
   role: 'assistant' | 'assistant_progress'
   content: string

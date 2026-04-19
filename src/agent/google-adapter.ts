@@ -1,3 +1,10 @@
+/**
+ * Google Gemini API adapter.
+ *
+ * Converts the internal `ChatMessage` format to Google's content/parts
+ * wire format and handles both batch and SSE streaming responses.
+ */
+
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { parseAssistantText } from '@/agent/assistant-text.js'
 import type {
@@ -10,59 +17,21 @@ import type {
   ToolCall,
 } from '@/types.js'
 import type { ToolRegistry } from '@/tools/framework.js'
-import {
-  extractErrorMessage,
-  parseRetryAfterMs,
-  readJsonBody,
-} from '@/utils/http.js'
-import {
-  AuthError,
-  NetworkError,
-  RateLimitError,
-  UnknownError,
-  exponentialRetrySchedule,
-  withRetry,
-} from '@/utils/result.js'
+import { readJsonBody } from '@/utils/http.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
+import { post } from '@/agent/request.js'
 
-const DEFAULT_MAX_RETRIES = 4
-
-type GooglePart =
+type Part =
   | { text: string }
   | { functionCall: { name: string; args?: unknown } }
   | { functionResponse: { name: string; response: Record<string, unknown> } }
 
-type GoogleMessage = {
+type Content = {
   role: 'user' | 'model'
-  parts: GooglePart[]
+  parts: Part[]
 }
 
-function getRetryLimit(): number {
-  const value = Number(process.env.ONCECODE_MAX_RETRIES)
-  if (!Number.isFinite(value) || value < 0) {
-    return DEFAULT_MAX_RETRIES
-  }
-  return Math.floor(value)
-}
-
-function toRequestError(args: {
-  status?: number
-  message: string
-  retryAfterMs?: number | null
-}): Error {
-  if (args.status === 401 || args.status === 403) {
-    return new AuthError(args.message)
-  }
-  if (args.status === 429) {
-    return new RateLimitError(args.message, args.retryAfterMs ?? undefined)
-  }
-  if (args.status !== undefined && args.status >= 500 && args.status < 600) {
-    return new NetworkError(args.message)
-  }
-  return new UnknownError(args.message)
-}
-
-function buildUsage(raw?: {
+function usage(raw?: {
   promptTokenCount?: number
   candidatesTokenCount?: number
   cachedContentTokenCount?: number
@@ -76,17 +45,18 @@ function buildUsage(raw?: {
   }
 }
 
-function toGoogleMessages(messages: ChatMessage[]): {
+/** Converts internal ChatMessage array to Google's system + contents format. */
+function convert(messages: ChatMessage[]): {
   system: string
-  contents: GoogleMessage[]
+  contents: Content[]
 } {
   const system = messages
-    .filter(message => message.role === 'system')
-    .map(message => message.content)
+    .filter(m => m.role === 'system')
+    .map(m => m.content)
     .join('\n\n')
-  const contents: GoogleMessage[] = []
+  const contents: Content[] = []
 
-  const push = (role: 'user' | 'model', part: GooglePart) => {
+  const push = (role: 'user' | 'model', part: Part) => {
     const last = contents.at(-1)
     if (last?.role === role) {
       last.parts.push(part)
@@ -95,36 +65,28 @@ function toGoogleMessages(messages: ChatMessage[]): {
     contents.push({ role, parts: [part] })
   }
 
-  for (const message of messages) {
-    if (message.role === 'system') continue
+  for (const msg of messages) {
+    if (msg.role === 'system') continue
 
-    if (message.role === 'user') {
-      push('user', { text: message.content })
+    if (msg.role === 'user') {
+      push('user', { text: msg.content })
       continue
     }
 
-    if (message.role === 'assistant' || message.role === 'assistant_progress') {
-      push('model', { text: message.content })
+    if (msg.role === 'assistant' || msg.role === 'assistant_progress') {
+      push('model', { text: msg.content })
       continue
     }
 
-    if (message.role === 'assistant_tool_call') {
-      push('model', {
-        functionCall: {
-          name: message.toolName,
-          args: message.input,
-        },
-      })
+    if (msg.role === 'assistant_tool_call') {
+      push('model', { functionCall: { name: msg.toolName, args: msg.input } })
       continue
     }
 
     push('user', {
       functionResponse: {
-        name: message.toolName,
-        response: {
-          content: message.content,
-          is_error: message.isError,
-        },
+        name: msg.toolName,
+        response: { content: msg.content, is_error: msg.isError },
       },
     })
   }
@@ -132,15 +94,16 @@ function toGoogleMessages(messages: ChatMessage[]): {
   return { system, contents }
 }
 
-function buildStep(args: {
+/** Builds a unified AgentStep from parsed Google response data. */
+function step(args: {
   text: string
   calls: ToolCall[]
   usage?: TokenUsage
-  stopReason?: string
+  reason?: string
 }): AgentStep {
   const parsed = parseAssistantText(args.text)
   const diagnostics: StepDiagnostics = {
-    stopReason: args.stopReason,
+    stopReason: args.reason,
     blockTypes: args.calls.length > 0 ? ['text', 'functionCall'] : ['text'],
     ignoredBlockTypes: [],
   }
@@ -173,108 +136,54 @@ export class GoogleModelAdapter implements ModelAdapter {
 
   async next(messages: ChatMessage[], options?: ModelRequestOptions): Promise<AgentStep> {
     const runtime = await this.getRuntimeConfig()
-    const payload = toGoogleMessages(messages)
-    const maxOutputTokens = options?.maxOutputTokens ?? resolveMaxOutputTokens(
+    const payload = convert(messages)
+    const max = options?.maxOutputTokens ?? resolveMaxOutputTokens(
       runtime.model,
       runtime.maxOutputTokens,
     )
-    const baseUrl = runtime.provider.baseUrl.replace(/\/$/, '')
-    const stream = typeof options?.onTextDelta === 'function'
+    const base = runtime.provider.baseUrl.replace(/\/$/, '')
+    const streaming = typeof options?.onTextDelta === 'function'
     const url = new URL(
-      `${baseUrl}/models/${runtime.model.api}:${stream ? 'streamGenerateContent' : 'generateContent'}`,
+      `${base}/models/${runtime.model.api}:${streaming ? 'streamGenerateContent' : 'generateContent'}`,
     )
-    if (stream) {
-      url.searchParams.set('alt', 'sse')
-    }
-    if (runtime.provider.auth.type === 'query' && runtime.provider.auth.name) {
-      url.searchParams.set(runtime.provider.auth.name, runtime.provider.auth.value)
-    }
+    if (streaming) url.searchParams.set('alt', 'sse')
 
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-    }
-
-    if (runtime.provider.auth.type === 'bearer') {
-      headers.Authorization = `Bearer ${runtime.provider.auth.value}`
-    }
-
-    if (runtime.provider.auth.type === 'header' && runtime.provider.auth.name) {
-      headers[runtime.provider.auth.name] = runtime.provider.auth.value
-    }
-
-    const requestBody: Record<string, unknown> = {
+    const body: Record<string, unknown> = {
       contents: payload.contents,
-      generationConfig: {
-        maxOutputTokens,
-      },
+      generationConfig: { maxOutputTokens: max },
     }
 
     if (payload.system) {
-      requestBody.systemInstruction = {
-        parts: [{ text: payload.system }],
-      }
+      body.systemInstruction = { parts: [{ text: payload.system }] }
     }
 
     if (options?.includeTools !== false) {
-      requestBody.tools = [
-        {
-          functionDeclarations: this.tools.list().map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.inputSchema,
-          })),
-        },
-      ]
+      body.tools = [{
+        functionDeclarations: this.tools.list().map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        })),
+      }]
     }
 
-    const schedule = exponentialRetrySchedule({
-      maxRetries: getRetryLimit(),
-      baseDelayMs: 500,
-      maxDelayMs: 8_000,
+    const response = await post({
+      url,
+      provider: runtime.provider,
+      body: JSON.stringify(body),
+      signal: options?.signal,
+      gzip: false,
     })
 
-    const response = await withRetry(async () => {
-      let response: Response
-      try {
-        response = await fetch(url.toString(), {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          signal: options?.signal,
-        })
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new NetworkError(error.message)
-        }
-        throw new UnknownError(error)
-      }
-
-      if (response.ok) {
-        return response
-      }
-
-      const data = await readJsonBody(response)
-      throw toRequestError({
-        status: response.status,
-        message: extractErrorMessage(data, response.status),
-        retryAfterMs: parseRetryAfterMs(response.headers.get('retry-after')),
-      })
-    }, schedule)
-
-    if (stream && options?.onTextDelta) {
-      return this.parseStreamingResponse(response, options.onTextDelta)
-    }
-
-    return this.parseBatchResponse(response)
+    if (streaming && options?.onTextDelta) return this.stream(response, options.onTextDelta)
+    return this.batch(response)
   }
 
-  private async parseBatchResponse(response: Response): Promise<AgentStep> {
+  private async batch(response: Response): Promise<AgentStep> {
     const data = (await readJsonBody(response)) as {
       candidates?: Array<{
         finishReason?: string
-        content?: {
-          parts?: GooglePart[]
-        }
+        content?: { parts?: Part[] }
       }>
       usageMetadata?: {
         promptTokenCount?: number
@@ -286,38 +195,36 @@ export class GoogleModelAdapter implements ModelAdapter {
     const text = (candidate?.content?.parts ?? [])
       .flatMap(part => 'text' in part ? [part.text] : [])
       .join('\n')
-    const calls = (candidate?.content?.parts ?? []).flatMap(part => {
+    const calls = (candidate?.content?.parts ?? []).flatMap((part, idx) => {
       if (!('functionCall' in part)) return []
       return [{
-        id: `call-${part.functionCall.name}`,
+        id: `call-${part.functionCall.name}-${idx}`,
         toolName: part.functionCall.name,
         input: part.functionCall.args ?? {},
       } satisfies ToolCall]
     })
 
-    return buildStep({
+    return step({
       text,
       calls,
-      usage: buildUsage(data.usageMetadata),
-      stopReason: candidate?.finishReason,
+      usage: usage(data.usageMetadata),
+      reason: candidate?.finishReason,
     })
   }
 
-  private async parseStreamingResponse(
+  private async stream(
     response: Response,
-    onTextDelta: (text: string) => void,
+    onDelta: (text: string) => void,
   ): Promise<AgentStep> {
     const body = response.body
-    if (!body) {
-      throw new Error('Streaming response has no body')
-    }
+    if (!body) throw new Error('Streaming response has no body')
 
     const reader = body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     let text = ''
-    let stopReason: string | undefined
-    let usage: TokenUsage | undefined
+    let reason: string | undefined
+    let tok: TokenUsage | undefined
     const calls: ToolCall[] = []
 
     try {
@@ -326,12 +233,12 @@ export class GoogleModelAdapter implements ModelAdapter {
         if (done) break
         buffer += decoder.decode(value, { stream: true })
 
-        let newline = buffer.indexOf('\n')
-        while (newline !== -1) {
-          const line = buffer.slice(0, newline).trim()
-          buffer = buffer.slice(newline + 1)
+        let nl = buffer.indexOf('\n')
+        while (nl !== -1) {
+          const line = buffer.slice(0, nl).trim()
+          buffer = buffer.slice(nl + 1)
           if (!line.startsWith('data: ')) {
-            newline = buffer.indexOf('\n')
+            nl = buffer.indexOf('\n')
             continue
           }
 
@@ -339,9 +246,7 @@ export class GoogleModelAdapter implements ModelAdapter {
           let event: {
             candidates?: Array<{
               finishReason?: string
-              content?: {
-                parts?: GooglePart[]
-              }
+              content?: { parts?: Part[] }
             }>
             usageMetadata?: {
               promptTokenCount?: number
@@ -353,7 +258,7 @@ export class GoogleModelAdapter implements ModelAdapter {
           try {
             event = JSON.parse(payload) as typeof event
           } catch {
-            newline = buffer.indexOf('\n')
+            nl = buffer.indexOf('\n')
             continue
           }
 
@@ -361,10 +266,9 @@ export class GoogleModelAdapter implements ModelAdapter {
           for (const part of candidate?.content?.parts ?? []) {
             if ('text' in part && part.text) {
               text += part.text
-              onTextDelta(part.text)
+              onDelta(part.text)
               continue
             }
-
             if ('functionCall' in part) {
               calls.push({
                 id: `call-${part.functionCall.name}-${calls.length}`,
@@ -374,26 +278,16 @@ export class GoogleModelAdapter implements ModelAdapter {
             }
           }
 
-          if (candidate?.finishReason) {
-            stopReason = candidate.finishReason
-          }
+          if (candidate?.finishReason) reason = candidate.finishReason
+          if (event.usageMetadata) tok = usage(event.usageMetadata)
 
-          if (event.usageMetadata) {
-            usage = buildUsage(event.usageMetadata)
-          }
-
-          newline = buffer.indexOf('\n')
+          nl = buffer.indexOf('\n')
         }
       }
     } finally {
       reader.releaseLock()
     }
 
-    return buildStep({
-      text,
-      calls,
-      usage,
-      stopReason,
-    })
+    return step({ text, calls, usage: tok, reason })
   }
 }

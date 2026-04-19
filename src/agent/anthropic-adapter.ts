@@ -1,106 +1,34 @@
+/**
+ * Anthropic Messages API adapter.
+ *
+ * Converts the internal `ChatMessage` format to Anthropic's content-block
+ * wire format and handles both batch and SSE streaming responses.
+ */
+
 import type { ToolRegistry } from '@/tools/framework.js'
 import type { ChatMessage, ModelAdapter, ModelRequestOptions, AgentStep, StepDiagnostics, TokenUsage, ToolCall } from '@/types.js'
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
 import { formatAssistantText, parseAssistantText } from '@/agent/assistant-text.js'
-import {
-  extractErrorMessage,
-  parseRetryAfterMs,
-  readJsonBody,
-} from '@/utils/http.js'
-import { gzipSync } from 'node:zlib'
-import {
-  AuthError,
-  NetworkError,
-  RateLimitError,
-  UnknownError,
-  exponentialRetrySchedule,
-  withRetry,
-} from '@/utils/result.js'
+import { readJsonBody } from '@/utils/http.js'
+import { post } from '@/agent/request.js'
 
-function getBaseUrl(runtime: RuntimeConfig): string {
-  return runtime.provider?.baseUrl ?? (runtime as RuntimeConfig & { baseUrl?: string }).baseUrl ?? 'https://api.anthropic.com'
-}
-
-function getAuth(runtime: RuntimeConfig): { type: 'bearer' | 'header'; value: string; name?: string } | null {
-  if (runtime.provider?.auth) {
-    if (runtime.provider.auth.type === 'query') {
-      return null
-    }
-    return {
-      type: runtime.provider.auth.type,
-      value: runtime.provider.auth.value,
-      name: runtime.provider.auth.name,
-    }
-  }
-
-  const legacy = runtime as RuntimeConfig & {
-    authToken?: string
-    apiKey?: string
-  }
-  if (legacy.authToken) {
-    return {
-      type: 'bearer',
-      value: legacy.authToken,
-    }
-  }
-  if (legacy.apiKey) {
-    return {
-      type: 'header',
-      name: 'x-api-key',
-      value: legacy.apiKey,
-    }
-  }
-  return null
-}
-
-const DEFAULT_MAX_RETRIES = 4
-
-type AnthropicContentBlock =
+type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
   | { type: string; [key: string]: unknown }
 
-type AnthropicMessage = {
+type Message = {
   role: 'user' | 'assistant'
-  content: AnthropicContentBlock[]
+  content: ContentBlock[]
 }
 
-function getRetryLimit(): number {
-  const value = Number(process.env.ONCECODE_MAX_RETRIES)
-  if (!Number.isFinite(value) || value < 0) {
-    return DEFAULT_MAX_RETRIES
-  }
-  return Math.floor(value)
-}
-
-function toRequestError(args: {
-  status?: number
-  message: string
-  retryAfterMs?: number | null
-}): Error {
-  if (args.status === 401 || args.status === 403) {
-    return new AuthError(args.message)
-  }
-  if (args.status === 429) {
-    return new RateLimitError(args.message, args.retryAfterMs ?? undefined)
-  }
-  if (args.status !== undefined && args.status >= 500 && args.status < 600) {
-    return new NetworkError(args.message)
-  }
-  return new UnknownError(args.message)
-}
-
-function isTextBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
-  type: 'text'
-}> {
+function isText(block: ContentBlock): block is Extract<ContentBlock, { type: 'text' }> {
   return block.type === 'text' && typeof block.text === 'string'
 }
 
-function isToolUseBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
-  type: 'tool_use'
-}> {
+function isToolUse(block: ContentBlock): block is Extract<ContentBlock, { type: 'tool_use' }> {
   return (
     block.type === 'tool_use' &&
     typeof block.id === 'string' &&
@@ -108,77 +36,128 @@ function isToolUseBlock(block: AnthropicContentBlock): block is Extract<Anthropi
   )
 }
 
-function toTextBlock(text: string): AnthropicContentBlock {
-  return { type: 'text', text }
-}
-
-function toAssistantText(message: Extract<ChatMessage, {
-  role: 'assistant' | 'assistant_progress'
-}>): string {
-  return formatAssistantText(message)
-}
-
-function pushAnthropicMessage(
-  messages: AnthropicMessage[],
+function push(
+  messages: Message[],
   role: 'user' | 'assistant',
-  block: AnthropicContentBlock,
+  block: ContentBlock,
 ): void {
   const last = messages.at(-1)
   if (last?.role === role) {
     last.content.push(block)
     return
   }
-
   messages.push({ role, content: [block] })
 }
 
-function toAnthropicMessages(messages: ChatMessage[]): {
+/** Converts internal ChatMessage array to Anthropic's system + messages format. */
+function convert(messages: ChatMessage[]): {
   system: string
-  messages: AnthropicMessage[]
+  messages: Message[]
 } {
   const system = messages
-    .filter(message => message.role === 'system')
-    .map(message => message.content)
+    .filter(m => m.role === 'system')
+    .map(m => m.content)
     .join('\n\n')
 
-  const converted: AnthropicMessage[] = []
+  const result: Message[] = []
 
-  for (const message of messages) {
-    if (message.role === 'system') continue
+  for (const msg of messages) {
+    if (msg.role === 'system') continue
 
-    if (message.role === 'user') {
-      pushAnthropicMessage(converted, 'user', toTextBlock(message.content))
+    if (msg.role === 'user') {
+      push(result, 'user', { type: 'text', text: msg.content })
       continue
     }
 
-    if (message.role === 'assistant' || message.role === 'assistant_progress') {
-      pushAnthropicMessage(
-        converted,
-        'assistant',
-        toTextBlock(toAssistantText(message)),
-      )
+    if (msg.role === 'assistant' || msg.role === 'assistant_progress') {
+      push(result, 'assistant', { type: 'text', text: formatAssistantText(msg) })
       continue
     }
 
-    if (message.role === 'assistant_tool_call') {
-      pushAnthropicMessage(converted, 'assistant', {
+    if (msg.role === 'assistant_tool_call') {
+      push(result, 'assistant', {
         type: 'tool_use',
-        id: message.toolUseId,
-        name: message.toolName,
-        input: message.input,
+        id: msg.toolUseId,
+        name: msg.toolName,
+        input: msg.input,
       })
       continue
     }
 
-    pushAnthropicMessage(converted, 'user', {
+    push(result, 'user', {
       type: 'tool_result',
-      tool_use_id: message.toolUseId,
-      content: message.content,
-      is_error: message.isError,
+      tool_use_id: msg.toolUseId,
+      content: msg.content,
+      is_error: msg.isError,
     })
   }
 
-  return { system, messages: converted }
+  return { system, messages: result }
+}
+
+/** Builds a unified AgentStep from Anthropic content blocks. */
+function step(
+  blocks: ContentBlock[],
+  stopReason?: string,
+  raw?: {
+    input_tokens?: number
+    output_tokens?: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  },
+): AgentStep {
+  const calls: ToolCall[] = []
+  const parts: string[] = []
+  const types: string[] = []
+  const ignored = new Set<string>()
+
+  for (const block of blocks) {
+    types.push(block.type)
+    if (isText(block)) {
+      parts.push(block.text)
+      continue
+    }
+    if (isToolUse(block)) {
+      calls.push({ id: block.id, toolName: block.name, input: block.input })
+      continue
+    }
+    ignored.add(block.type)
+  }
+
+  const parsed = parseAssistantText(parts.join('\n').trim())
+  const diagnostics: StepDiagnostics = {
+    stopReason,
+    blockTypes: types,
+    ignoredBlockTypes: [...ignored],
+  }
+
+  const usage: TokenUsage | undefined = raw
+    ? {
+        inputTokens: raw.input_tokens ?? 0,
+        outputTokens: raw.output_tokens ?? 0,
+        cacheCreationInputTokens: raw.cache_creation_input_tokens ?? 0,
+        cacheReadInputTokens: raw.cache_read_input_tokens ?? 0,
+      }
+    : undefined
+
+  if (calls.length > 0) {
+    return {
+      type: 'tool_calls',
+      calls,
+      content: parsed.content || undefined,
+      contentKind: parsed.kind === 'progress' ? 'progress' : undefined,
+      diagnostics,
+      usage,
+    }
+  }
+
+  return {
+    type: 'assistant',
+    content: parsed.content,
+    kind: parsed.kind,
+    diagnostics,
+    usage,
+  }
 }
 
 export class AnthropicModelAdapter implements ModelAdapter {
@@ -189,108 +168,47 @@ export class AnthropicModelAdapter implements ModelAdapter {
 
   async next(messages: ChatMessage[], options?: ModelRequestOptions) {
     const runtime = await this.getRuntimeConfig()
-    const payload = toAnthropicMessages(messages)
-    const url = `${getBaseUrl(runtime).replace(/\/$/, '')}/v1/messages`
-    const maxOutputTokens = options?.maxOutputTokens ?? resolveMaxOutputTokens(
+    const payload = convert(messages)
+    const url = `${runtime.provider.baseUrl.replace(/\/$/, '')}/v1/messages`
+    const max = options?.maxOutputTokens ?? resolveMaxOutputTokens(
       runtime.model,
       runtime.maxOutputTokens,
     )
 
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    }
-
-    const auth = getAuth(runtime)
-    if (auth?.type === 'bearer') {
-      headers.Authorization = `Bearer ${auth.value}`
-    }
-
-    if (auth?.type === 'header' && auth.name) {
-      headers[auth.name] = auth.value
-    }
-
-    const includeTools = options?.includeTools !== false
-    const requestBody: Record<string, unknown> = {
+    const body: Record<string, unknown> = {
       model: runtime.model.api,
       system: payload.system,
       messages: payload.messages,
-      max_tokens: maxOutputTokens,
+      max_tokens: max,
     }
 
-    if (includeTools) {
-      requestBody.tools = this.tools.list().map(tool => ({
+    if (options?.includeTools !== false) {
+      body.tools = this.tools.list().map(tool => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
       }))
     }
 
-    // Use SSE streaming when a text delta callback is provided
-    const useStreaming = typeof options?.onTextDelta === 'function'
-    if (useStreaming) {
-      requestBody.stream = true
-    }
+    const streaming = typeof options?.onTextDelta === 'function'
+    if (streaming) body.stream = true
 
-    const bodyJson = JSON.stringify(requestBody)
-    const useGzip = bodyJson.length > 4_096
-    const bodyPayload = useGzip ? gzipSync(bodyJson) : bodyJson
-
-    if (useGzip) {
-      headers['content-encoding'] = 'gzip'
-    }
-
-    const schedule = exponentialRetrySchedule({
-      maxRetries: getRetryLimit(),
-      baseDelayMs: 500,
-      maxDelayMs: 8_000,
+    const response = await post({
+      url,
+      provider: runtime.provider,
+      body: JSON.stringify(body),
+      extra: { 'anthropic-version': '2023-06-01' },
+      signal: options?.signal,
     })
 
-    const response = await withRetry(async () => {
-      let response: Response
-      try {
-        response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: bodyPayload,
-          signal: options?.signal,
-        })
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new NetworkError(error.message)
-        }
-        throw new UnknownError(error)
-      }
-
-      if (response.ok) {
-        return response
-      }
-
-      const data = await readJsonBody(response)
-      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
-      throw toRequestError({
-        status: response.status,
-        message: extractErrorMessage(data, response.status),
-        retryAfterMs,
-      })
-    }, schedule)
-
-    if (!response.ok) {
-      const data = await readJsonBody(response)
-      throw new Error(extractErrorMessage(data, response.status))
-    }
-
-    if (useStreaming) {
-      return this.parseStreamingResponse(response, options!.onTextDelta!)
-    }
-
-    return this.parseBatchResponse(response)
+    if (streaming) return this.stream(response, options!.onTextDelta!)
+    return this.batch(response)
   }
 
-  private async parseBatchResponse(response: Response): Promise<AgentStep> {
+  private async batch(response: Response): Promise<AgentStep> {
     const data = (await readJsonBody(response)) as {
       stop_reason?: string
-      content?: AnthropicContentBlock[]
+      content?: ContentBlock[]
       usage?: {
         input_tokens?: number
         output_tokens?: number
@@ -298,22 +216,19 @@ export class AnthropicModelAdapter implements ModelAdapter {
         cache_read_input_tokens?: number
       }
     }
-
-    return buildAgentStep(data.content ?? [], data.stop_reason, data.usage)
+    return step(data.content ?? [], data.stop_reason, data.usage)
   }
 
-  private async parseStreamingResponse(
+  private async stream(
     response: Response,
-    onTextDelta: (text: string) => void,
+    onDelta: (text: string) => void,
   ): Promise<AgentStep> {
     const body = response.body
-    if (!body) {
-      throw new Error('Streaming response has no body')
-    }
+    if (!body) throw new Error('Streaming response has no body')
 
-    const blocks: AnthropicContentBlock[] = []
-    let currentBlockIndex = -1
-    let currentToolJsonChunks: string[] = []
+    const blocks: ContentBlock[] = []
+    let idx = -1
+    let chunks: string[] = []
     let stopReason: string | undefined
     let usage: TokenUsage | undefined
 
@@ -328,63 +243,59 @@ export class AnthropicModelAdapter implements ModelAdapter {
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Process complete SSE lines
-        let newlineIdx: number
-        while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, newlineIdx).trim()
-          buffer = buffer.slice(newlineIdx + 1)
+        let nl: number
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, nl).trim()
+          buffer = buffer.slice(nl + 1)
 
           if (!line.startsWith('data: ')) continue
-          const jsonStr = line.slice(6)
-          if (jsonStr === '[DONE]') continue
+          const json = line.slice(6)
+          if (json === '[DONE]') continue
 
           let event: Record<string, unknown>
           try {
-            event = JSON.parse(jsonStr) as Record<string, unknown>
+            event = JSON.parse(json) as Record<string, unknown>
           } catch {
             continue
           }
 
-          const eventType = event.type as string
+          const type = event.type as string
 
-          if (eventType === 'content_block_start') {
-            currentBlockIndex = (event.index as number) ?? blocks.length
-            const block = event.content_block as AnthropicContentBlock
-            blocks[currentBlockIndex] = block
-            currentToolJsonChunks = []
+          if (type === 'content_block_start') {
+            idx = (event.index as number) ?? blocks.length
+            blocks[idx] = event.content_block as ContentBlock
+            chunks = []
           }
 
-          if (eventType === 'content_block_delta') {
+          if (type === 'content_block_delta') {
             const delta = event.delta as Record<string, unknown>
             if (delta.type === 'text_delta' && typeof delta.text === 'string') {
-              onTextDelta(delta.text)
-              // Accumulate text in the block
-              const textBlock = blocks[currentBlockIndex]
-              if (textBlock && 'text' in textBlock) {
-                (textBlock as { text: string }).text += delta.text
+              onDelta(delta.text)
+              const block = blocks[idx]
+              if (block && 'text' in block) {
+                (block as { text: string }).text += delta.text
               }
             }
             if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
-              currentToolJsonChunks.push(delta.partial_json)
+              chunks.push(delta.partial_json)
             }
           }
 
-          if (eventType === 'content_block_stop') {
-            // Finalize tool use input from accumulated JSON chunks
-            if (currentToolJsonChunks.length > 0 && blocks[currentBlockIndex]) {
-              const block = blocks[currentBlockIndex]
+          if (type === 'content_block_stop') {
+            if (chunks.length > 0 && blocks[idx]) {
+              const block = blocks[idx]
               if (block.type === 'tool_use') {
                 try {
-                  (block as { input: unknown }).input = JSON.parse(currentToolJsonChunks.join(''))
+                  (block as { input: unknown }).input = JSON.parse(chunks.join(''))
                 } catch {
                   (block as { input: unknown }).input = {}
                 }
               }
             }
-            currentToolJsonChunks = []
+            chunks = []
           }
 
-          if (eventType === 'message_start') {
+          if (type === 'message_start') {
             const msg = event.message as Record<string, unknown> | undefined
             if (msg?.usage) {
               const u = msg.usage as Record<string, number>
@@ -397,15 +308,11 @@ export class AnthropicModelAdapter implements ModelAdapter {
             }
           }
 
-          if (eventType === 'message_delta') {
+          if (type === 'message_delta') {
             const delta = event.delta as Record<string, unknown> | undefined
-            if (delta?.stop_reason) {
-              stopReason = delta.stop_reason as string
-            }
-            const deltaUsage = event.usage as Record<string, number> | undefined
-            if (deltaUsage && usage) {
-              usage.outputTokens = deltaUsage.output_tokens ?? usage.outputTokens
-            }
+            if (delta?.stop_reason) stopReason = delta.stop_reason as string
+            const du = event.usage as Record<string, number> | undefined
+            if (du && usage) usage.outputTokens = du.output_tokens ?? usage.outputTokens
           }
         }
       }
@@ -413,87 +320,11 @@ export class AnthropicModelAdapter implements ModelAdapter {
       reader.releaseLock()
     }
 
-    return buildAgentStep(blocks, stopReason, usage ? {
+    return step(blocks, stopReason, usage ? {
       input_tokens: usage.inputTokens,
       output_tokens: usage.outputTokens,
       cache_creation_input_tokens: usage.cacheCreationInputTokens,
       cache_read_input_tokens: usage.cacheReadInputTokens,
     } : undefined)
-  }
-}
-
-// ── Shared step builder ──────────────────────────────────────────
-
-function buildAgentStep(
-  blocks: AnthropicContentBlock[],
-  stopReason?: string,
-  rawUsage?: {
-    input_tokens?: number
-    output_tokens?: number
-    cache_creation_input_tokens?: number
-    cache_read_input_tokens?: number
-  },
-): AgentStep {
-  const toolCalls: ToolCall[] = []
-  const textParts: string[] = []
-  const blockTypes: string[] = []
-  const ignoredBlockTypes = new Set<string>()
-
-  for (const block of blocks) {
-    blockTypes.push(block.type)
-
-    if (isTextBlock(block)) {
-      textParts.push(block.text)
-      continue
-    }
-
-    if (isToolUseBlock(block)) {
-      toolCalls.push({
-        id: block.id,
-        toolName: block.name,
-        input: block.input,
-      })
-      continue
-    }
-
-    ignoredBlockTypes.add(block.type)
-  }
-
-  const parsedText = parseAssistantText(textParts.join('\n').trim())
-  const diagnostics: StepDiagnostics = {
-    stopReason,
-    blockTypes,
-    ignoredBlockTypes: [...ignoredBlockTypes],
-  }
-
-  const usage: TokenUsage | undefined = rawUsage
-    ? {
-        inputTokens: rawUsage.input_tokens ?? 0,
-        outputTokens: rawUsage.output_tokens ?? 0,
-        cacheCreationInputTokens: rawUsage.cache_creation_input_tokens ?? 0,
-        cacheReadInputTokens: rawUsage.cache_read_input_tokens ?? 0,
-      }
-    : undefined
-
-  if (toolCalls.length > 0) {
-    return {
-      type: 'tool_calls' as const,
-      calls: toolCalls,
-      content: parsedText.content || undefined,
-      contentKind:
-        parsedText.kind === 'progress'
-          ? ('progress' as const)
-          : undefined,
-      diagnostics,
-      usage,
-    }
-  }
-
-  return {
-    type: 'assistant' as const,
-    content: parsedText.content,
-    kind: parsedText.kind,
-    diagnostics,
-    usage,
   }
 }

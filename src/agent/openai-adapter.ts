@@ -1,4 +1,10 @@
-import { gzipSync } from 'node:zlib'
+/**
+ * OpenAI Chat Completions API adapter.
+ *
+ * Converts the internal `ChatMessage` format to OpenAI's message/tool_calls
+ * wire format and handles both batch and SSE streaming responses.
+ */
+
 import type { RuntimeConfig } from '@/config/runtime.js'
 import { parseAssistantText } from '@/agent/assistant-text.js'
 import type {
@@ -11,24 +17,11 @@ import type {
   ToolCall,
 } from '@/types.js'
 import type { ToolRegistry } from '@/tools/framework.js'
-import {
-  extractErrorMessage,
-  parseRetryAfterMs,
-  readJsonBody,
-} from '@/utils/http.js'
-import {
-  AuthError,
-  NetworkError,
-  RateLimitError,
-  UnknownError,
-  exponentialRetrySchedule,
-  withRetry,
-} from '@/utils/result.js'
+import { readJsonBody } from '@/utils/http.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
+import { post } from '@/agent/request.js'
 
-const DEFAULT_MAX_RETRIES = 4
-
-type OpenAIMessage = {
+type Message = {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content?: string
   tool_call_id?: string
@@ -43,80 +36,48 @@ type OpenAIMessage = {
   }>
 }
 
-function getRetryLimit(): number {
-  const value = Number(process.env.ONCECODE_MAX_RETRIES)
-  if (!Number.isFinite(value) || value < 0) {
-    return DEFAULT_MAX_RETRIES
-  }
-  return Math.floor(value)
-}
+/** Converts internal ChatMessage array to OpenAI's message format. */
+function convert(messages: ChatMessage[]): Message[] {
+  const result: Message[] = []
 
-function toRequestError(args: {
-  status?: number
-  message: string
-  retryAfterMs?: number | null
-}): Error {
-  if (args.status === 401 || args.status === 403) {
-    return new AuthError(args.message)
-  }
-  if (args.status === 429) {
-    return new RateLimitError(args.message, args.retryAfterMs ?? undefined)
-  }
-  if (args.status !== undefined && args.status >= 500 && args.status < 600) {
-    return new NetworkError(args.message)
-  }
-  return new UnknownError(args.message)
-}
-
-function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
-  const result: OpenAIMessage[] = []
-
-  for (const message of messages) {
-    if (message.role === 'system' || message.role === 'user') {
-      result.push({
-        role: message.role,
-        content: message.content,
-      })
+  for (const msg of messages) {
+    if (msg.role === 'system' || msg.role === 'user') {
+      result.push({ role: msg.role, content: msg.content })
       continue
     }
 
-    if (message.role === 'assistant' || message.role === 'assistant_progress') {
-      result.push({
-        role: 'assistant',
-        content: message.content,
-      })
+    if (msg.role === 'assistant' || msg.role === 'assistant_progress') {
+      result.push({ role: 'assistant', content: msg.content })
       continue
     }
 
-    if (message.role === 'assistant_tool_call') {
+    if (msg.role === 'assistant_tool_call') {
       result.push({
         role: 'assistant',
-        tool_calls: [
-          {
-            id: message.toolUseId,
-            type: 'function',
-            function: {
-              name: message.toolName,
-              arguments: JSON.stringify(message.input ?? {}),
-            },
+        tool_calls: [{
+          id: msg.toolUseId,
+          type: 'function',
+          function: {
+            name: msg.toolName,
+            arguments: JSON.stringify(msg.input ?? {}),
           },
-        ],
+        }],
       })
       continue
     }
 
     result.push({
       role: 'tool',
-      tool_call_id: message.toolUseId,
-      name: message.toolName,
-      content: message.content,
+      tool_call_id: msg.toolUseId,
+      name: msg.toolName,
+      content: msg.content,
     })
   }
 
   return result
 }
 
-function buildUsage(raw?: {
+function usage(raw?: {
   prompt_tokens?: number
   completion_tokens?: number
 }): TokenUsage | undefined {
@@ -129,15 +90,16 @@ function buildUsage(raw?: {
   }
 }
 
-function buildStep(args: {
+/** Builds a unified AgentStep from parsed OpenAI response data. */
+function step(args: {
   text: string
   calls: ToolCall[]
   usage?: TokenUsage
-  finishReason?: string
+  reason?: string
 }): AgentStep {
   const parsed = parseAssistantText(args.text)
   const diagnostics: StepDiagnostics = {
-    stopReason: args.finishReason,
+    stopReason: args.reason,
     blockTypes: args.calls.length > 0 ? ['text', 'tool_calls'] : ['text'],
     ignoredBlockTypes: [],
   }
@@ -170,33 +132,22 @@ export class OpenAIModelAdapter implements ModelAdapter {
 
   async next(messages: ChatMessage[], options?: ModelRequestOptions): Promise<AgentStep> {
     const runtime = await this.getRuntimeConfig()
-    const maxOutputTokens = options?.maxOutputTokens ?? resolveMaxOutputTokens(
+    const max = options?.maxOutputTokens ?? resolveMaxOutputTokens(
       runtime.model,
       runtime.maxOutputTokens,
     )
-    const baseUrl = runtime.provider.baseUrl.replace(/\/$/, '')
-    const url = `${baseUrl}/chat/completions`
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-    }
+    const url = `${runtime.provider.baseUrl.replace(/\/$/, '')}/chat/completions`
+    const streaming = typeof options?.onTextDelta === 'function'
 
-    if (runtime.provider.auth.type === 'bearer') {
-      headers.Authorization = `Bearer ${runtime.provider.auth.value}`
-    }
-
-    if (runtime.provider.auth.type === 'header' && runtime.provider.auth.name) {
-      headers[runtime.provider.auth.name] = runtime.provider.auth.value
-    }
-
-    const requestBody: Record<string, unknown> = {
+    const body: Record<string, unknown> = {
       model: runtime.model.api,
-      messages: toOpenAIMessages(messages),
-      max_tokens: maxOutputTokens,
-      stream: typeof options?.onTextDelta === 'function',
+      messages: convert(messages),
+      max_tokens: max,
+      stream: streaming,
     }
 
     if (options?.includeTools !== false) {
-      requestBody.tools = this.tools.list().map(tool => ({
+      body.tools = this.tools.list().map(tool => ({
         type: 'function',
         function: {
           name: tool.name,
@@ -206,61 +157,18 @@ export class OpenAIModelAdapter implements ModelAdapter {
       }))
     }
 
-    const bodyJson = JSON.stringify(requestBody)
-    const useGzip = bodyJson.length > 4_096
-    const body = useGzip ? gzipSync(bodyJson) : bodyJson
-    if (useGzip) {
-      headers['content-encoding'] = 'gzip'
-    }
-
-    const schedule = exponentialRetrySchedule({
-      maxRetries: getRetryLimit(),
-      baseDelayMs: 500,
-      maxDelayMs: 8_000,
+    const response = await post({
+      url,
+      provider: runtime.provider,
+      body: JSON.stringify(body),
+      signal: options?.signal,
     })
 
-    const response = await withRetry(async () => {
-      let response: Response
-      try {
-        const reqUrl = runtime.provider.auth.type === 'query' && runtime.provider.auth.name
-          ? new URL(url)
-          : null
-        if (reqUrl) {
-          reqUrl.searchParams.set(runtime.provider.auth.name ?? 'key', runtime.provider.auth.value)
-        }
-        response = await fetch(reqUrl?.toString() ?? url, {
-          method: 'POST',
-          headers,
-          body,
-          signal: options?.signal,
-        })
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new NetworkError(error.message)
-        }
-        throw new UnknownError(error)
-      }
-
-      if (response.ok) {
-        return response
-      }
-
-      const data = await readJsonBody(response)
-      throw toRequestError({
-        status: response.status,
-        message: extractErrorMessage(data, response.status),
-        retryAfterMs: parseRetryAfterMs(response.headers.get('retry-after')),
-      })
-    }, schedule)
-
-    if (typeof options?.onTextDelta === 'function') {
-      return this.parseStreamingResponse(response, options.onTextDelta)
-    }
-
-    return this.parseBatchResponse(response)
+    if (streaming) return this.stream(response, options!.onTextDelta!)
+    return this.batch(response)
   }
 
-  private async parseBatchResponse(response: Response): Promise<AgentStep> {
+  private async batch(response: Response): Promise<AgentStep> {
     const data = (await readJsonBody(response)) as {
       choices?: Array<{
         finish_reason?: string
@@ -298,29 +206,27 @@ export class OpenAIModelAdapter implements ModelAdapter {
       }
     })
 
-    return buildStep({
+    return step({
       text: choice?.message?.content ?? '',
       calls,
-      usage: buildUsage(data.usage),
-      finishReason: choice?.finish_reason,
+      usage: usage(data.usage),
+      reason: choice?.finish_reason,
     })
   }
 
-  private async parseStreamingResponse(
+  private async stream(
     response: Response,
-    onTextDelta: (text: string) => void,
+    onDelta: (text: string) => void,
   ): Promise<AgentStep> {
     const body = response.body
-    if (!body) {
-      throw new Error('Streaming response has no body')
-    }
+    if (!body) throw new Error('Streaming response has no body')
 
     const reader = body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     let text = ''
-    let finishReason: string | undefined
-    let usage: TokenUsage | undefined
+    let reason: string | undefined
+    let tok: TokenUsage | undefined
     const calls = new Map<string, { toolName: string; parts: string[] }>()
 
     try {
@@ -329,19 +235,19 @@ export class OpenAIModelAdapter implements ModelAdapter {
         if (done) break
         buffer += decoder.decode(value, { stream: true })
 
-        let newline = buffer.indexOf('\n')
-        while (newline !== -1) {
-          const line = buffer.slice(0, newline).trim()
-          buffer = buffer.slice(newline + 1)
+        let nl = buffer.indexOf('\n')
+        while (nl !== -1) {
+          const line = buffer.slice(0, nl).trim()
+          buffer = buffer.slice(nl + 1)
 
           if (!line.startsWith('data: ')) {
-            newline = buffer.indexOf('\n')
+            nl = buffer.indexOf('\n')
             continue
           }
 
           const payload = line.slice(6)
           if (payload === '[DONE]') {
-            newline = buffer.indexOf('\n')
+            nl = buffer.indexOf('\n')
             continue
           }
 
@@ -369,7 +275,7 @@ export class OpenAIModelAdapter implements ModelAdapter {
           try {
             event = JSON.parse(payload) as typeof event
           } catch {
-            newline = buffer.indexOf('\n')
+            nl = buffer.indexOf('\n')
             continue
           }
 
@@ -377,58 +283,38 @@ export class OpenAIModelAdapter implements ModelAdapter {
           const delta = choice?.delta
           if (typeof delta?.content === 'string' && delta.content.length > 0) {
             text += delta.content
-            onTextDelta(delta.content)
+            onDelta(delta.content)
           }
 
           for (const call of delta?.tool_calls ?? []) {
             const id = call.id ?? `tool-${call.index ?? calls.size}`
-            const current = calls.get(id) ?? {
-              toolName: call.function?.name ?? 'unknown',
-              parts: [],
-            }
-            if (call.function?.name) {
-              current.toolName = call.function.name
-            }
-            if (call.function?.arguments) {
-              current.parts.push(call.function.arguments)
-            }
+            const current = calls.get(id) ?? { toolName: call.function?.name ?? 'unknown', parts: [] }
+            if (call.function?.name) current.toolName = call.function.name
+            if (call.function?.arguments) current.parts.push(call.function.arguments)
             calls.set(id, current)
           }
 
-          if (choice?.finish_reason) {
-            finishReason = choice.finish_reason
-          }
+          if (choice?.finish_reason) reason = choice.finish_reason
+          if (event.usage) tok = usage(event.usage)
 
-          if (event.usage) {
-            usage = buildUsage(event.usage)
-          }
-
-          newline = buffer.indexOf('\n')
+          nl = buffer.indexOf('\n')
         }
       }
     } finally {
       reader.releaseLock()
     }
 
-    return buildStep({
+    return step({
       text,
       calls: [...calls.entries()].map(([id, call]) => {
         try {
-          return {
-            id,
-            toolName: call.toolName,
-            input: JSON.parse(call.parts.join('') || '{}'),
-          }
+          return { id, toolName: call.toolName, input: JSON.parse(call.parts.join('') || '{}') }
         } catch {
-          return {
-            id,
-            toolName: call.toolName,
-            input: {},
-          }
+          return { id, toolName: call.toolName, input: {} }
         }
       }),
-      usage,
-      finishReason,
+      usage: tok,
+      reason,
     })
   }
 }

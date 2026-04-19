@@ -48,8 +48,12 @@ export async function readProviderState(
     return { providers: {} }
   }
 
-  const parsed = JSON.parse(content) as ProviderState
-  return normalize(parsed)
+  try {
+    const parsed = JSON.parse(content) as ProviderState
+    return normalize(parsed)
+  } catch {
+    return { providers: {} }
+  }
 }
 
 export async function saveProviderState(
