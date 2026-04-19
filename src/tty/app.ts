@@ -303,7 +303,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
             state.transcriptScrollOffset,
             getTranscriptBodyLines(args, state),
           )
-        : `${renderStatusLine(null)}\n\n${t('ui_hint_help')}`,
+        : `${renderStatusLine(null)}\n\n${args.runtime ? t('ui_hint_help') : t('ui_hint_connect')}`,
       {
         rightTitle: `${state.transcript.length} events`,
         minBodyLines: getTranscriptBodyLines(args, state),
@@ -494,6 +494,15 @@ async function handleInput(
                 matches: matches.join('\n'),
               })
             : t('cmd_unknown'),
+    })
+    return false
+  }
+
+  // Guard: require a connected provider before sending to the model
+  if (!args.runtime) {
+    pushTranscriptEntry(state, {
+      kind: 'assistant',
+      body: t('ui_no_provider'),
     })
     return false
   }
@@ -1274,6 +1283,11 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
       permissionArgs.messages[0]?.role !== 'system'
     ) {
       await refreshSystemPrompt(permissionArgs)
+    }
+
+    // Auto-open /connect dialog when no provider is configured
+    if (!permissionArgs.runtime) {
+      await openConnectDialog(permissionArgs, state)
     }
 
     renderScreen(permissionArgs, state)

@@ -57,6 +57,8 @@ const en = {
 
   // ── UI elements ─────────────────────────────────────────────────────
   ui_hint_help: 'Type /help for commands.',
+  ui_hint_connect: 'No provider connected. Use /connect to set up a provider, or /help for commands.',
+  ui_no_provider: 'No provider connected. Use /connect to connect one first.',
   ui_thinking: 'Thinking...',
   ui_running_tool: 'Running {{toolName}}...',
   ui_turn_running: 'Current turn is still running...',

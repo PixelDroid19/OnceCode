@@ -57,6 +57,8 @@ const es = {
 
   // ── UI elements ─────────────────────────────────────────────────────
   ui_hint_help: 'Escribe /help para ver los comandos.',
+  ui_hint_connect: 'No hay proveedor conectado. Usa /connect para configurar uno, o /help para ver los comandos.',
+  ui_no_provider: 'No hay proveedor conectado. Usa /connect para conectar uno primero.',
   ui_thinking: 'Pensando...',
   ui_running_tool: 'Ejecutando {{toolName}}...',
   ui_turn_running: 'El turno actual sigue en ejecución...',
