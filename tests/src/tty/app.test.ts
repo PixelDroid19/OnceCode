@@ -72,4 +72,58 @@ describe('tty-app', () => {
     expect(setRawMode).toHaveBeenCalledWith(false)
     expect(writes.join('')).toContain('OnceCode exited.')
   })
+
+  it('cancels an active turn on first ctrl-c and exits on second', async () => {
+    const writes: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+      writes.push(String(chunk))
+      return true
+    }) as typeof process.stdout.write)
+
+    const stdin = process.stdin as typeof process.stdin & EventEmitter & {
+      setRawMode?: (value: boolean) => void
+      pause: () => typeof process.stdin
+    }
+    stdin.setRawMode = vi.fn()
+    vi.spyOn(process.stdin, 'pause').mockImplementation(() => process.stdin)
+    Object.defineProperty(stdin, 'isTTY', { configurable: true, value: true })
+    Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: true })
+    Object.defineProperty(process.stdout, 'columns', { configurable: true, value: 120 })
+    Object.defineProperty(process.stdout, 'rows', { configurable: true, value: 40 })
+
+    const tools = new ToolRegistry([])
+    const promise = runTtyApp({
+      runtime: null,
+      tools,
+      model: {
+        next: vi.fn(async (_messages, options) => {
+          await new Promise<void>(resolve => {
+            options?.signal?.addEventListener('abort', () => resolve(), { once: true })
+          })
+          return { type: 'assistant', content: 'cancelled by test' }
+        }),
+      },
+      messages: [{ role: 'system', content: 'system prompt' }],
+      cwd: process.cwd(),
+      permissions: {
+        whenReady: vi.fn(async () => {}),
+        getSummary: vi.fn(() => ['cwd: test']),
+        beginTurn: vi.fn(),
+        endTurn: vi.fn(),
+      } as never,
+      contextTracker: new ContextTracker('mock-model'),
+    })
+
+    await flush()
+    stdin.emit('data', Buffer.from('h'))
+    stdin.emit('data', Buffer.from('i'))
+    stdin.emit('data', Buffer.from('\r'))
+    await flush()
+    stdin.emit('data', Buffer.from('\u0003'))
+    await flush()
+    stdin.emit('data', Buffer.from('\u0003'))
+
+    await promise
+    expect(writes.join('')).toContain('OnceCode exited.')
+  })
 })

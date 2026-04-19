@@ -4,13 +4,18 @@ import type { RuntimeConfig } from '@/config/runtime.js'
 import { resolveMaxOutputTokens } from '@/context/window.js'
 import {
   extractErrorMessage,
-  getRetryDelayMs,
   parseRetryAfterMs,
   readJsonBody,
-  sleep,
 } from '@/utils/http.js'
-import { t } from '@/i18n/index.js'
 import { gzipSync } from 'node:zlib'
+import {
+  AuthError,
+  NetworkError,
+  RateLimitError,
+  UnknownError,
+  exponentialRetrySchedule,
+  withRetry,
+} from '@/utils/result.js'
 
 const DEFAULT_MAX_RETRIES = 4
 
@@ -33,15 +38,21 @@ function getRetryLimit(): number {
   return Math.floor(value)
 }
 
-/**
- * Conditional retry filtering: only retry on transient errors.
- * 429 (rate limit) and 5xx (server errors) are retryable.
- * 401/403 (auth), 400 (bad request), 404 are NOT retryable.
- */
-function isRetryableStatus(status: number): boolean {
-  if (status === 429) return true
-  if (status >= 500 && status < 600) return true
-  return false
+function toRequestError(args: {
+  status?: number
+  message: string
+  retryAfterMs?: number | null
+}): Error {
+  if (args.status === 401 || args.status === 403) {
+    return new AuthError(args.message)
+  }
+  if (args.status === 429) {
+    return new RateLimitError(args.message, args.retryAfterMs ?? undefined)
+  }
+  if (args.status !== undefined && args.status >= 500 && args.status < 600) {
+    return new NetworkError(args.message)
+  }
+  return new UnknownError(args.message)
 }
 
 function isTextBlock(block: AnthropicContentBlock): block is Extract<AnthropicContentBlock, {
@@ -229,27 +240,40 @@ export class AnthropicModelAdapter implements ModelAdapter {
       headers['content-encoding'] = 'gzip'
     }
 
-    const maxRetries = getRetryLimit()
-    let response: Response | null = null
-    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-      response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: bodyPayload,
-      })
-      if (response.ok) {
-        break
-      }
-      if (!isRetryableStatus(response.status) || attempt >= maxRetries) {
-        break
-      }
-      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
-      await sleep(getRetryDelayMs(attempt + 1, retryAfterMs))
-    }
+    const schedule = exponentialRetrySchedule({
+      maxRetries: getRetryLimit(),
+      baseDelayMs: 500,
+      maxDelayMs: 8_000,
+    })
 
-    if (!response) {
-      throw new Error(t('agent_request_failed_no_response'))
-    }
+    const response = await withRetry(async () => {
+      let response: Response
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: bodyPayload,
+          signal: options?.signal,
+        })
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new NetworkError(error.message)
+        }
+        throw new UnknownError(error)
+      }
+
+      if (response.ok) {
+        return response
+      }
+
+      const data = await readJsonBody(response)
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
+      throw toRequestError({
+        status: response.status,
+        message: extractErrorMessage(data, response.status),
+        retryAfterMs,
+      })
+    }, schedule)
 
     if (!response.ok) {
       const data = await readJsonBody(response)

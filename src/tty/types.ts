@@ -43,6 +43,8 @@ export type ScreenState = {
   nextEntryId: number
   pendingApproval: PendingApproval | null
   isBusy: boolean
+  turnController: AbortController | null
+  streamingAssistantEntryId: number | null
 }
 
 /** A transcript entry without an ID, used before insertion into state. */

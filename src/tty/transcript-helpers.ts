@@ -15,6 +15,22 @@ export function pushTranscriptEntry(
   return id
 }
 
+/** Updates an assistant/progress transcript entry body in place. */
+export function updateTranscriptEntry(
+  state: ScreenState,
+  entryId: number,
+  body: string,
+): void {
+  const entry = state.transcript.find(item => item.id === entryId)
+  if (!entry) {
+    return
+  }
+
+  if (entry.kind === 'assistant' || entry.kind === 'progress' || entry.kind === 'user') {
+    entry.body = body
+  }
+}
+
 /** Updates a tool transcript entry's status and body text. */
 export function updateToolEntry(
   state: ScreenState,

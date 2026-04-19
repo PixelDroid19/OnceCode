@@ -6,6 +6,7 @@ import { ToolRegistry } from '@/tools/framework.js'
 describe('anthropic-adapter', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
     delete process.env.ONCECODE_MAX_RETRIES
   })
 
@@ -72,7 +73,7 @@ describe('anthropic-adapter', () => {
         new Response(JSON.stringify({ error: { message: 'busy' } }), {
           status: 429,
           statusText: 'Too Many Requests',
-          headers: { 'content-type': 'application/json', 'retry-after': '0' },
+          headers: { 'content-type': 'application/json', 'retry-after': '1' },
         }),
       )
       .mockResolvedValueOnce(
@@ -85,12 +86,11 @@ describe('anthropic-adapter', () => {
         ),
       )
 
-    const sleepSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: (...args: unknown[]) => void) => {
-      fn()
-      return 0 as unknown as ReturnType<typeof setTimeout>
-    }) as typeof setTimeout)
+    vi.useFakeTimers()
+    const promise = adapter.next([{ role: 'user', content: 'hello' }])
+    await vi.advanceTimersByTimeAsync(1_100)
 
-    const step = await adapter.next([{ role: 'user', content: 'hello' }])
+    const step = await promise
     expect(step).toEqual({
       type: 'assistant',
       content: 'done',
@@ -102,7 +102,6 @@ describe('anthropic-adapter', () => {
       },
     })
     expect(globalThis.fetch).toHaveBeenCalledTimes(2)
-    expect(sleepSpy).toHaveBeenCalled()
   })
 
   it('surfaces structured api errors', async () => {
@@ -116,5 +115,39 @@ describe('anthropic-adapter', () => {
     )
 
     await expect(adapter.next([{ role: 'user', content: 'hello' }])).rejects.toThrow('bad auth')
+  })
+
+  it('parses SSE streaming text deltas and tool calls', async () => {
+    const adapter = createAdapter()
+    const chunks = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":0}}}\n',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"<progress>hel"}}\n',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo</progress>"}}\n',
+      'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call-1","name":"read_file","input":{}}}\n',
+      'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\":\\"README.md\\"}"}}\n',
+      'data: {"type":"content_block_stop","index":1}\n',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":12}}\n',
+    ].join('')
+    const onTextDelta = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(chunks, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      }),
+    )
+
+    const step = await adapter.next([{ role: 'user', content: 'read it' }], {
+      onTextDelta,
+    })
+
+    expect(onTextDelta).toHaveBeenCalledWith('<progress>hel')
+    expect(onTextDelta).toHaveBeenCalledWith('lo</progress>')
+    expect(step).toMatchObject({
+      type: 'tool_calls',
+      content: 'hello',
+      contentKind: 'progress',
+      calls: [{ id: 'call-1', toolName: 'read_file', input: { path: 'README.md' } }],
+    })
   })
 })

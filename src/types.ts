@@ -60,6 +60,8 @@ export interface ModelRequestOptions {
   maxOutputTokens?: number
   /** When `false`, omit tools from the request (e.g. during compaction summaries). */
   includeTools?: boolean
+  /** Abort the in-flight model request. */
+  signal?: AbortSignal
   /** When provided, use SSE streaming and emit text deltas progressively. */
   onTextDelta?: (text: string) => void
 }

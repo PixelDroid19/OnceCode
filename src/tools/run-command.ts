@@ -1,13 +1,12 @@
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
+import { spawn } from 'node:child_process'
 import { z } from 'zod'
 import { registerBackgroundShellTask } from '@/workspace/background-tasks.js'
 import { t } from '@/i18n/index.js'
 import type { ToolDefinition } from './framework.js'
 import { splitCommandLine } from '@/utils/command-line.js'
 import { resolveToolPath } from '@/workspace/paths.js'
-
-const execFileAsync = promisify(execFile)
+import { execStreaming } from '@/utils/exec-streaming.js'
+import { timeoutSignal } from '@/utils/abort.js'
 
 /** Default timeout for foreground commands (ms). */
 const COMMAND_TIMEOUT_MS = 60_000
@@ -185,17 +184,20 @@ export const runCommandTool: ToolDefinition<Input> = {
       }
     }
 
-    const result = await execFileAsync(command, args, {
+    const result = await execStreaming({
+      command,
+      args,
       cwd: effectiveCwd,
-      maxBuffer: 1024 * 1024,
       env: process.env,
-      timeout: COMMAND_TIMEOUT_MS,
-      signal: AbortSignal.timeout(COMMAND_TIMEOUT_MS),
+      timeoutMs: COMMAND_TIMEOUT_MS,
+      signal: timeoutSignal(COMMAND_TIMEOUT_MS, context.signal),
+      maxLines: 1_000,
+      maxBytes: 1024 * 1024,
     })
 
     return {
       ok: true,
-      output: [result.stdout, result.stderr].filter(Boolean).join('\n').trim(),
+      output: [result.stdout, result.stderr].filter(Boolean).join('\n').trim() + (result.truncated ? '\n... (output truncated)' : ''),
     }
   },
 }

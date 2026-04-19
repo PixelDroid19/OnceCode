@@ -2,6 +2,7 @@ import type { ToolRegistry, ToolResult } from '@/tools/framework.js'
 import type { ChatMessage, ModelAdapter, TokenUsage, ToolCall } from '@/types.js'
 import type { PermissionManager } from '@/permissions/manager.js'
 import { t } from '@/i18n/index.js'
+import { isAbortError } from '@/utils/abort.js'
 
 /** Maximum number of read-only tools to execute in parallel. */
 const MAX_PARALLEL_TOOLS = 5
@@ -79,6 +80,7 @@ export async function runAgentTurn(args: {
   permissions?: PermissionManager
   maxSteps?: number
   signal?: AbortSignal
+  onTextDelta?: (text: string) => void
   onToolStart?: (toolName: string, input: unknown) => void
   onToolResult?: (toolName: string, output: string, isError: boolean) => void
   onAssistantMessage?: (content: string) => void
@@ -111,7 +113,21 @@ export async function runAgentTurn(args: {
       ]
     }
 
-    const next = await args.model.next(messages)
+    let next
+    try {
+      next = await args.model.next(messages, {
+        signal: args.signal,
+        onTextDelta: args.onTextDelta,
+      })
+    } catch (error) {
+      if (args.signal?.aborted || isAbortError(error)) {
+        return [
+          ...messages,
+          { role: 'assistant', content: t('agent_cancelled') },
+        ]
+      }
+      throw error
+    }
 
     // Report usage to the tracker after every API call
     if (next.usage) {

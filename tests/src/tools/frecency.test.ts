@@ -1,14 +1,27 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { readFile } from 'node:fs/promises'
 import {
   trackFileAccess,
   getFrecencyScore,
   resetFrecency,
+  initFrecency,
+  saveFrecency,
 } from '@/tools/frecency'
+import { makeTempDir, removeTempDir } from '../helpers/fs'
 
 describe('frecency', () => {
+  let dir = ''
+
   beforeEach(() => {
     resetFrecency()
     vi.useRealTimers()
+  })
+
+  afterEach(async () => {
+    if (dir) {
+      await removeTempDir(dir)
+      dir = ''
+    }
   })
 
   it('returns 0 for an unknown file', () => {
@@ -57,5 +70,19 @@ describe('frecency', () => {
   it('normalizes paths to forward slashes', () => {
     trackFileAccess('src\\utils\\helper.ts')
     expect(getFrecencyScore('src/utils/helper.ts')).toBeGreaterThan(0)
+  })
+
+  it('persists and reloads frecency data', async () => {
+    dir = await makeTempDir('oncecode-frecency')
+    await initFrecency(dir)
+    trackFileAccess('src/index.ts')
+    await saveFrecency()
+
+    const raw = await readFile(`${dir}/frecency.json`, 'utf8')
+    expect(raw).toContain('src/index.ts')
+
+    resetFrecency()
+    await initFrecency(dir)
+    expect(getFrecencyScore('src/index.ts')).toBeGreaterThan(0)
   })
 })

@@ -32,6 +32,7 @@ import {
 import type { TtyAppArgs, ScreenState, AggregatedEditProgress } from './types.js'
 import {
   pushTranscriptEntry,
+  updateTranscriptEntry,
   updateToolEntry,
   collapseToolEntry,
   getRunningToolEntries,
@@ -57,6 +58,7 @@ import {
   movePendingApprovalSelection,
   createPermissionPromptHandler,
 } from './approval-controller.js'
+import { withScope } from '@/utils/scope.js'
 
 export type { TtyAppArgs }
 
@@ -340,6 +342,9 @@ async function handleInput(
   const pendingToolEntries = new Map<string, number[]>()
   const aggregatedEditByKey = new Map<string, AggregatedEditProgress>()
   const aggregatedEditByEntryId = new Map<number, AggregatedEditProgress>()
+  const turnController = new AbortController()
+  state.turnController = turnController
+  state.streamingAssistantEntryId = null
 
   args.permissions.beginTurn()
   try {
@@ -349,11 +354,33 @@ async function handleInput(
       messages: args.messages,
       cwd: args.cwd,
       permissions: args.permissions,
+      signal: turnController.signal,
+      onTextDelta(text) {
+        const entryId = state.streamingAssistantEntryId ?? pushTranscriptEntry(state, {
+          kind: 'assistant',
+          body: '',
+        })
+        state.streamingAssistantEntryId = entryId
+        const existing = state.transcript.find(entry => entry.id === entryId)
+        const body = existing && (existing.kind === 'assistant' || existing.kind === 'progress' || existing.kind === 'user')
+          ? `${existing.body}${text}`
+          : text
+        updateTranscriptEntry(state, entryId, body)
+        state.transcriptScrollOffset = 0
+        rerender()
+      },
       onUsageUpdate(usage) {
         args.contextTracker.recordUsage(usage)
         rerender()
       },
       onAssistantMessage(content) {
+        if (state.streamingAssistantEntryId !== null) {
+          updateTranscriptEntry(state, state.streamingAssistantEntryId, content)
+          state.streamingAssistantEntryId = null
+          state.transcriptScrollOffset = 0
+          rerender()
+          return
+        }
         pushTranscriptEntry(state, {
           kind: 'assistant',
           body: content,
@@ -362,6 +389,9 @@ async function handleInput(
         rerender()
       },
       onProgressMessage(content) {
+        if (state.streamingAssistantEntryId !== null) {
+          state.streamingAssistantEntryId = null
+        }
         pushTranscriptEntry(state, {
           kind: 'progress',
           body: content,
@@ -509,6 +539,8 @@ async function handleInput(
   } finally {
     args.permissions.endTurn()
     state.isBusy = false
+    state.turnController = null
+    state.streamingAssistantEntryId = null
   }
 
   finalizeDanglingRunningTools(state)
@@ -532,6 +564,12 @@ function handleApprovalEvent(
   }
 
   if (event.kind === 'text' && event.ctrl && event.text === 'c') {
+    if (state.isBusy && state.turnController && !state.turnController.signal.aborted) {
+      state.turnController.abort(new DOMException('User cancelled turn', 'AbortError'))
+      state.status = t('agent_cancelled')
+      rerender()
+      return
+    }
     finish()
     return
   }
@@ -908,57 +946,13 @@ function handleNormalEvent(
 }
 
 export async function runTtyApp(args: TtyAppArgs): Promise<void> {
-  enterAlternateScreen()
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true)
-  }
-  hideCursor()
-
-  const state: ScreenState = {
-    input: '',
-    cursorOffset: 0,
-    transcript: [],
-    transcriptScrollOffset: 0,
-    selectedSlashIndex: 0,
-    status: null,
-    activeTool: null,
-    recentTools: [],
-    history: await loadHistoryEntries(),
-    historyIndex: 0,
-    historyDraft: '',
-    nextEntryId: 1,
-    pendingApproval: null,
-    isBusy: false,
-  }
-  state.historyIndex = state.history.length
-
-  const permissionArgs: TtyAppArgs = {
-    ...args,
-    permissions: new PermissionManager(
-      args.cwd,
-      createPermissionPromptHandler(state, () => renderScreen(permissionArgs, state)),
-    ),
-  }
-  await permissionArgs.permissions.whenReady()
-  if (
-    permissionArgs.messages.length === 0 ||
-    permissionArgs.messages[0]?.role !== 'system'
-  ) {
-    await refreshSystemPrompt(permissionArgs)
-  }
-
-  renderScreen(permissionArgs, state)
-
-  await new Promise<void>(resolve => {
-    let finished = false
-    let inputRemainder = ''
-    let eventChain = Promise.resolve()
-    let submitInFlight = false
-
-    const cleanup = () => {
-      process.stdin.off('data', onData)
-      process.stdin.off('end', onEnd)
-      process.stdin.off('close', onClose)
+  await withScope(async scope => {
+    enterAlternateScreen()
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true)
+    }
+    hideCursor()
+    scope.addFinalizer(() => {
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false)
       }
@@ -966,18 +960,67 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
       exitAlternateScreen()
       process.stdin.pause()
       process.stdout.write(`${t('ui_exited')}\n`)
+    })
+
+    const state: ScreenState = {
+      input: '',
+      cursorOffset: 0,
+      transcript: [],
+      transcriptScrollOffset: 0,
+      selectedSlashIndex: 0,
+      status: null,
+      activeTool: null,
+      recentTools: [],
+      history: await loadHistoryEntries(),
+      historyIndex: 0,
+      historyDraft: '',
+      nextEntryId: 1,
+      pendingApproval: null,
+      isBusy: false,
+      turnController: null,
+      streamingAssistantEntryId: null,
+    }
+    state.historyIndex = state.history.length
+
+    const permissionArgs: TtyAppArgs = {
+      ...args,
+      permissions: new PermissionManager(
+        args.cwd,
+        createPermissionPromptHandler(state, () => renderScreen(permissionArgs, state)),
+      ),
+    }
+    await permissionArgs.permissions.whenReady()
+    if (
+      permissionArgs.messages.length === 0 ||
+      permissionArgs.messages[0]?.role !== 'system'
+    ) {
+      await refreshSystemPrompt(permissionArgs)
     }
 
-    const finish = () => {
-      if (finished) return
-      finished = true
-      cleanup()
-      resolve()
-    }
+    renderScreen(permissionArgs, state)
 
-    const rerender = () => renderScreen(permissionArgs, state)
+    await new Promise<void>(resolve => {
+      let finished = false
+      let inputRemainder = ''
+      let eventChain = Promise.resolve()
+      let submitInFlight = false
 
-    const handleEvent = async (event: ParsedInputEvent) => {
+      const cleanup = () => {
+        process.stdin.off('data', onData)
+        process.stdin.off('end', onEnd)
+        process.stdin.off('close', onClose)
+      }
+
+      const finish = () => {
+        if (finished) return
+        finished = true
+        cleanup()
+        resolve()
+      }
+
+      const rerender = () => renderScreen(permissionArgs, state)
+
+      const handleEvent = async (event: ParsedInputEvent) => {
       try {
         if (state.pendingApproval) {
           handleApprovalEvent(state, event, rerender, finish)
@@ -1035,32 +1078,36 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
         state.status = null
         rerender()
       }
-    }
+      }
 
-    const onData = (chunk: Buffer | string) => {
-      const parsed = parseInputChunk(inputRemainder, chunk)
-      inputRemainder = parsed.rest
-      eventChain = eventChain.then(async () => {
-        for (const event of parsed.events) {
-          await handleEvent(event)
-        }
-      }).catch(error => {
-        pushTranscriptEntry(state, {
-          kind: 'assistant',
-          body: error instanceof Error ? error.message : String(error),
+      const onData = (chunk: Buffer | string) => {
+        const parsed = parseInputChunk(inputRemainder, chunk)
+        inputRemainder = parsed.rest
+        eventChain = eventChain.then(async () => {
+          for (const event of parsed.events) {
+            await handleEvent(event)
+          }
+        }).catch(error => {
+          pushTranscriptEntry(state, {
+            kind: 'assistant',
+            body: error instanceof Error ? error.message : String(error),
+          })
+          state.input = ''
+          state.cursorOffset = 0
+          state.selectedSlashIndex = 0
+          state.status = null
+          rerender()
         })
-        state.input = ''
-        state.cursorOffset = 0
-        state.selectedSlashIndex = 0
-        state.status = null
-        rerender()
-      })
-    }
+      }
 
-    const onEnd = () => finish()
-    const onClose = () => finish()
-    process.stdin.on('data', onData)
-    process.stdin.once('end', onEnd)
-    process.stdin.once('close', onClose)
+      const onEnd = () => finish()
+      const onClose = () => finish()
+      process.stdin.on('data', onData)
+      process.stdin.once('end', onEnd)
+      process.stdin.once('close', onClose)
+      scope.addFinalizer(() => {
+        cleanup()
+      })
+    })
   })
 }

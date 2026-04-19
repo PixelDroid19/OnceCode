@@ -266,4 +266,30 @@ describe('agent-loop', () => {
     // Model should only be called once (no second iteration)
     expect(model.next).toHaveBeenCalledOnce()
   })
+
+  it('forwards onTextDelta and signal to model.next', async () => {
+    const onTextDelta = vi.fn()
+    const controller = new AbortController()
+    const model: ModelAdapter = {
+      next: vi.fn(async (_messages, options) => {
+        options?.onTextDelta?.('hel')
+        options?.onTextDelta?.('lo')
+        expect(options?.signal).toBe(controller.signal)
+        return { type: 'assistant', content: 'hello' }
+      }),
+    }
+
+    const messages = await runAgentTurn({
+      model,
+      tools: new ToolRegistry([]),
+      messages: [{ role: 'user', content: 'hello' }],
+      cwd: process.cwd(),
+      signal: controller.signal,
+      onTextDelta,
+    })
+
+    expect(onTextDelta).toHaveBeenNthCalledWith(1, 'hel')
+    expect(onTextDelta).toHaveBeenNthCalledWith(2, 'lo')
+    expect(messages.at(-1)).toEqual({ role: 'assistant', content: 'hello' })
+  })
 })
